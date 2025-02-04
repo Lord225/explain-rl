@@ -26,6 +26,29 @@ def run_experiment():
 
     x_train = x_train.reshape(x_train.shape[0], 32, 32, 3)
 
+    # convert to tf dataset for better performance and augmentation (include y_train)
+    x_train = tf.data.Dataset.from_tensor_slices(x_train)
+
+    # add augmentation
+    random_augmentation = keras.Sequential(
+        [
+            tf.keras.layers.RandomFlip("horizontal"),
+            tf.keras.layers.RandomRotation(0.2),
+            tf.keras.layers.RandomZoom(0.15),
+            tf.keras.layers.RandomTranslation(0.2, 0.2),
+        ]
+    )
+
+    x_train = x_train.repeat(5).map(lambda x: random_augmentation(x, training=True), AUTOTUNE)
+
+    # add y
+    y_train = tf.data.Dataset.from_tensor_slices(y_train)
+
+    # zip x and y
+    train = tf.data.Dataset.zip((x_train, y_train))
+    # batch, repeat, prefetch
+    train = train.batch(128).prefetch(AUTOTUNE)
+
     x_test, y_test = test
 
     x_test = x_test / 255.0
@@ -34,45 +57,18 @@ def run_experiment():
 
     y_test = y_test.astype("float32")
 
-    # pad images to 32x32
-    # x_test = np.pad(
-    #     x_test, ((0, 0), (2, 2), (2, 2)), mode="constant", constant_values=0
-    # )
-
-    # n = int(np.sqrt(patches.shape[1]))
-    # plt.figure(figsize=(4, 4))
-    # for i, patch in enumerate(patches[0]):
-    #     ax = plt.subplot(n, n, i + 1)
-    #     patch_img = tf.reshape(patch, (patch_size, patch_size))
-    #     plt.imshow(patch_img.numpy().astype("uint8"))
-    #     plt.axis("off")
-
-    # plt.show()
-
-    # model = create_vit_classifier(
-    #     input_shape=(32, 32, 1),
-    #     num_classes=10,
-    #     patch_size=4,
-    #     num_patches=64,
-    #     projection_dim=16,
-    #     transformer_layers=1,
-    #     num_heads=2,
-    #     transformer_units=[16],
-    #     mlp_head_units=[32],
-    # )
-
     model = VisualTransformer.ViT(
         image_size=(32, 32, 3),
         patch_size=4,
-        num_layers=6,
+        num_layers=8,
         hidden_size=64,
-        num_heads=4,
+        num_heads=8,
         name="vit",
         mlp_dim=64,
         classes=10,
-        dropout=0.1,
+        dropout=0.15,
         activation="linear",
-        representation_size=32,
+        representation_size=64,
     )
 
     optimizer = keras.optimizers.Adam(learning_rate=0.0005)
@@ -86,10 +82,10 @@ def run_experiment():
     model.build((None, 32, 32, 3))
     model.summary()
 
-    _ = model.predict(x_train[:1])
+    _ = model.predict(x_test[:1])
 
     # Call the model on some input data to define the input shape
-    attention = VisualTransformer.attention_map(model, x_train[0])
+    attention = VisualTransformer.attention_map(model, x_test[0])
     plt.matshow(attention.reshape(32, 32), cmap="viridis")
     plt.show()
 
@@ -97,13 +93,13 @@ def run_experiment():
         keras.callbacks.LearningRateScheduler(lambda epoch: 0.001 * 0.92 ** (epoch))
     ]
 
-    model.fit(x_train, y_train, batch_size=128, epochs=200, callbacks=callbacks)
+    model.fit(train, batch_size=128, epochs=200, callbacks=callbacks)
     _, accuracy = model.evaluate(x_test, y_test)
 
-    plt.imshow(x_train[:1].reshape(32, 32, 3), cmap="gray")
+    plt.imshow(x_test[:1].reshape(32, 32, 3), cmap="gray")
     
 
-    attention = VisualTransformer.attention_map(model, x_train[0])
+    attention = VisualTransformer.attention_map(model, x_test[0])
 
     plt.matshow(attention.reshape(32, 32), cmap="viridis")
     plt.show()
