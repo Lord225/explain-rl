@@ -289,6 +289,7 @@ class ViT(tf.keras.Model):
     def get_config(self):
         config = super().get_config()
         config.update({
+            "name": self.name,
             "image_size": self.image_size,
             "patch_size": self.patch_size,
             "num_layers": self.num_layers,
@@ -435,21 +436,11 @@ def run_experiment():
     plt.matshow(attention.reshape(32, 32), cmap="viridis")
     plt.show()
 
-    # for each image resize it to 32x32
-    # x_train = tf.image.resize(x_train[..., tf.newaxis], (32, 32)).numpy()
-    # x_test = tf.image.resize(x_test[..., tf.newaxis], (32, 32)).numpy()
-    # print(x_train.shape)
-
-    # try getting attention weights
-    #attentions = model.get_attentions(x_train[:1])
-
-    #print(attentions)
-
     callbacks = [
         keras.callbacks.LearningRateScheduler(lambda epoch: 0.01 * 0.92 ** (epoch))
     ]
 
-    model.fit(x_train, y_train, batch_size=128, epochs=150, callbacks=callbacks)
+    model.fit(x_train, y_train, batch_size=128, epochs=1, callbacks=callbacks)
     _, accuracy = model.evaluate(x_test, y_test)
 
     plt.imshow(x_train[:1].reshape(32, 32, 3), cmap="gray")
