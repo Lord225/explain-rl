@@ -406,7 +406,7 @@ def run_experiment():
     model = ViT(
         image_size=(32, 32, 3),
         patch_size=4,
-        num_layers=4,
+        num_layers=6,
         hidden_size=64,
         num_heads=4,
         name="vit",
