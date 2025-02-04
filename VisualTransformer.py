@@ -13,8 +13,6 @@ from keras import layers
 
 @tf.keras.utils.register_keras_serializable()
 class ClassToken(tf.keras.layers.Layer):
-    """Append a class token to an input layer."""
-
     def build(self, input_shape):
         cls_init = tf.zeros_initializer()
         self.hidden_size = input_shape[-1]
