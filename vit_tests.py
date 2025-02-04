@@ -191,7 +191,7 @@ def run_experiment():
     AUTOTUNE = tf.data.experimental.AUTOTUNE
     # load the dataset using keras
 
-    train, test = keras.datasets.cifar100.load_data()
+    train, test = keras.datasets.cifar10.load_data()
     x_train, y_train = train
 
     y_train = y_train.astype("float32")
@@ -254,20 +254,20 @@ def run_experiment():
 
     model = VisionTransformer(
         input_shape=(image_size, image_size, 3),        
-        num_classes=100,               
+        num_classes=10,               
         patch_size=patch_size,      
         num_patches=64,           
-        projection_dim=32,          
-        transformer_layers=2,       
-        num_heads=16,           
-        transformer_units=[64, 32],     
+        projection_dim=256,          
+        transformer_layers=6,       
+        num_heads=8,           
+        transformer_units=[256],     
     )
 
     attention_mask = model.compute_attention_map(x_train[:1])
     print(attention_mask)
     print(attention_mask.shape)
 
-    optimizer = keras.optimizers.Adam(learning_rate=0.0005)
+    optimizer = keras.optimizers.Adam(learning_rate=0.001)
     model.compile(
         optimizer=optimizer,
         loss=keras.losses.SparseCategoricalCrossentropy(from_logits=True),
@@ -289,10 +289,10 @@ def run_experiment():
     #print(attentions)
 
     callbacks = [
-        keras.callbacks.LearningRateScheduler(lambda epoch: 0.001 * 0.92 ** (epoch))
+        keras.callbacks.LearningRateScheduler(lambda epoch: 0.01 * 0.92 ** (epoch))
     ]
 
-    model.fit(x_train, y_train, batch_size=128, epochs=100, callbacks=callbacks)
+    model.fit(x_train, y_train, batch_size=128, epochs=50, callbacks=callbacks)
     _, accuracy = model.evaluate(x_test, y_test)
 
     # plot x_train[:1]

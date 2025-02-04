@@ -259,9 +259,9 @@ def run_experiment():
         patch_size=patch_size,      
         num_patches=64,           
         projection_dim=16,          
-        transformer_layers=2,       
-        num_heads=16,           
-        transformer_units=[32, 16],     
+        transformer_layers=4,       
+        num_heads=8,           
+        transformer_units=[16, 16],     
     )
 
     attention_mask = model.compute_attention_map(x_train[:1])
@@ -293,7 +293,7 @@ def run_experiment():
         keras.callbacks.LearningRateScheduler(lambda epoch: 0.001 * 0.92 ** (epoch))
     ]
 
-    model.fit(x_train, y_train, batch_size=128, epochs=150, callbacks=callbacks)
+    model.fit(x_train, y_train, batch_size=128, epochs=30, callbacks=callbacks)
     _, accuracy = model.evaluate(x_test, y_test)
 
     # plot x_train[:1]
