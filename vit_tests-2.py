@@ -191,40 +191,41 @@ def run_experiment():
     AUTOTUNE = tf.data.experimental.AUTOTUNE
     # load the dataset using keras
 
-    train, test = keras.datasets.cifar100.load_data()
+    train, test = keras.datasets.mnist.load_data()
     x_train, y_train = train
 
     y_train = y_train.astype("float32")
 
-    # # pad images to 32x32
-    # x_train = np.pad(
-    #     x_train, ((0, 0), (2, 2), (2, 2)), mode="constant", constant_values=0
-    # )
+    # pad images to 32x32
+    x_train = np.pad(
+        x_train, ((0, 0), (2, 2), (2, 2)), mode="constant", constant_values=0
+    )
+    print(x_train.shape)
 
     x_train = x_train / 255.0
 
-    x_train = x_train.reshape(x_train.shape[0], 32, 32, 3)
+    x_train = x_train.reshape(x_train.shape[0], 32, 32, 1)
 
     x_test, y_test = test
+    
+    x_test = x_test.astype("float32")
+
+    x_test = np.pad(
+        x_test, ((0, 0), (2, 2), (2, 2)), mode="constant", constant_values=0
+    )
 
     x_test = x_test / 255.0
 
-    x_test = x_test.reshape(x_test.shape[0], 32, 32, 3)
-
+    x_test = x_test.reshape(x_test.shape[0], 32, 32, 1)
     y_test = y_test.astype("float32")
-
-    # pad images to 32x32
-    # x_test = np.pad(
-    #     x_test, ((0, 0), (2, 2), (2, 2)), mode="constant", constant_values=0
-    # )
-    x_test = x_test.reshape(x_test.shape[0], 32, 32, 3)
+    x_test = x_test.reshape(x_test.shape[0], 32, 32, 1)
     plt.figure(figsize=(4, 4))
     image = x_train[np.random.choice(range(x_train.shape[0]))]
-    plt.imshow(image.reshape(32, 32, 3), cmap="gray")
+    plt.imshow(image.reshape(32, 32, 1), cmap="gray")
     plt.axis("off")
     image_size = 32
     patch_size = 4
-    patches = Patches(patch_size)(image.reshape(1, image_size, image_size, 3))
+    patches = Patches(patch_size)(image.reshape(1, image_size, image_size, 1))
     print(f"Image size: {image_size} X {image_size}")
     print(f"Patch size: {patch_size} X {patch_size}")
     print(f"Patches per image: {patches.shape[1]}")
@@ -253,14 +254,14 @@ def run_experiment():
     # )
 
     model = VisionTransformer(
-        input_shape=(image_size, image_size, 3),        
-        num_classes=100,               
+        input_shape=(image_size, image_size, 1),        
+        num_classes=10,               
         patch_size=patch_size,      
         num_patches=64,           
-        projection_dim=32,          
+        projection_dim=16,          
         transformer_layers=2,       
         num_heads=16,           
-        transformer_units=[64, 32],     
+        transformer_units=[32, 16],     
     )
 
     attention_mask = model.compute_attention_map(x_train[:1])
@@ -275,7 +276,7 @@ def run_experiment():
     )
 
     # summarize the model
-    model.build((None, 32, 32, 3))
+    model.build((None, 32, 32, 1))
     model.summary()
 
     # for each image resize it to 32x32
@@ -292,11 +293,11 @@ def run_experiment():
         keras.callbacks.LearningRateScheduler(lambda epoch: 0.001 * 0.92 ** (epoch))
     ]
 
-    model.fit(x_train, y_train, batch_size=128, epochs=100, callbacks=callbacks)
+    model.fit(x_train, y_train, batch_size=128, epochs=150, callbacks=callbacks)
     _, accuracy = model.evaluate(x_test, y_test)
 
     # plot x_train[:1]
-    plt.imshow(x_train[:1].reshape(32, 32, 3), cmap="gray")
+    plt.imshow(x_train[:1].reshape(32, 32, 1), cmap="gray")
     
     # attention map is of shape (1, 1, 2, 64, 64)
     attentions = model.compute_attention_map(x_train[:1])
@@ -326,7 +327,7 @@ def run_experiment():
     print(f"Test accuracy: {round(accuracy * 100, 2)}%")
 
 
-    model.save("vit_cifar100")
+    model.save("mints10")
 
 
 if __name__ == "__main__":
