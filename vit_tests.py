@@ -42,7 +42,7 @@ def run_experiment():
     x_train = x_train.repeat(5).map(lambda x: random_augmentation(x, training=True), AUTOTUNE)
 
     # add y
-    y_train = tf.data.Dataset.from_tensor_slices(y_train)
+    y_train = tf.data.Dataset.from_tensor_slices(y_train).repeat(5)
 
     # zip x and y
     train = tf.data.Dataset.zip((x_train, y_train))
@@ -93,7 +93,7 @@ def run_experiment():
         keras.callbacks.LearningRateScheduler(lambda epoch: 0.001 * 0.92 ** (epoch))
     ]
 
-    model.fit(train, batch_size=128, epochs=200, callbacks=callbacks)
+    model.fit(train, batch_size=128, epochs=50, callbacks=callbacks)
     _, accuracy = model.evaluate(x_test, y_test)
 
     plt.imshow(x_test[:1].reshape(32, 32, 3), cmap="gray")
