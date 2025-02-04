@@ -390,11 +390,11 @@ def run_experiment():
         patch_size=4,
         num_layers=2,
         hidden_size=16,
-        num_heads=2,
+        num_heads=8,
         name="vit",
         mlp_dim=16,
         classes=10,
-        dropout=0.1,
+        dropout=0.15,
         activation="linear",
         representation_size=16,
     )
@@ -433,7 +433,7 @@ def run_experiment():
         keras.callbacks.LearningRateScheduler(lambda epoch: 0.001 * 0.92 ** (epoch))
     ]
 
-    model.fit(x_train, y_train, batch_size=128, epochs=1, callbacks=callbacks)
+    model.fit(x_train, y_train, batch_size=256, epochs=150, callbacks=callbacks)
     _, accuracy = model.evaluate(x_test, y_test)
 
     # plot x_train[:1]
