@@ -437,10 +437,10 @@ def run_experiment():
     plt.show()
 
     callbacks = [
-        keras.callbacks.LearningRateScheduler(lambda epoch: 0.01 * 0.92 ** (epoch))
+        keras.callbacks.LearningRateScheduler(lambda epoch: 0.001 * 0.92 ** (epoch))
     ]
 
-    model.fit(x_train, y_train, batch_size=128, epochs=1, callbacks=callbacks)
+    model.fit(x_train, y_train, batch_size=128, epochs=200, callbacks=callbacks)
     _, accuracy = model.evaluate(x_test, y_test)
 
     plt.imshow(x_train[:1].reshape(32, 32, 3), cmap="gray")
