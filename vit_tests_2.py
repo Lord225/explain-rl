@@ -2,6 +2,7 @@ from gc import callbacks
 from math import pi
 from typing import Optional
 import tensorflow as tf
+import tensorflow_addons as tfa
 from tensorflow import keras
 import numpy as np
 import keras.layers
@@ -9,7 +10,6 @@ import keras.activations
 import keras.optimizers
 
 import keras
-from keras import layers
 
 
 @tf.keras.utils.register_keras_serializable()
@@ -289,6 +289,7 @@ class ViT(tf.keras.Model):
     def get_config(self):
         config = super().get_config()
         config.update({
+            "name": self.name,
             "image_size": self.image_size,
             "patch_size": self.patch_size,
             "num_layers": self.num_layers,
@@ -311,11 +312,10 @@ import cv2
 
 def attention_map(model: ViT, image: np.ndarray):
     img_height, img_width = model.image_size[:-1]
-    channel = model.image_size[-1]
     grid_size = img_height // model.patch_size
 
     # Prepare the input
-    X = cv2.resize(image, (img_height, img_width)).reshape(1, img_height, img_width, channel)
+    X = cv2.resize(image, (img_height, img_width)).reshape(1, img_height, img_width, 1)
 
     weights = model.get_attentions(X)
     print(weights.shape)
@@ -347,75 +347,58 @@ def attention_map(model: ViT, image: np.ndarray):
     ]
     return mask
 
-
 import matplotlib.pyplot as plt
 
 def run_experiment():
     AUTOTUNE = tf.data.experimental.AUTOTUNE
     # load the dataset using keras
 
-    train, test = keras.datasets.cifar10.load_data()
+    train, test = keras.datasets.mnist.load_data()
     x_train, y_train = train
 
     y_train = y_train.astype("float32")
 
-    # # pad images to 32x32
-    # x_train = np.pad(
-    #     x_train, ((0, 0), (2, 2), (2, 2)), mode="constant", constant_values=0
-    # )
+    # pad images to 32x32
+    x_train = np.pad(
+        x_train, ((0, 0), (2, 2), (2, 2)), mode="constant", constant_values=0
+    )
+    print(x_train.shape)
 
     x_train = x_train / 255.0
 
-    x_train = x_train.reshape(x_train.shape[0], 32, 32, 3)
+    x_train = x_train.reshape(x_train.shape[0], 32, 32, 1)
 
     x_test, y_test = test
+    
+    x_test = x_test.astype("float32")
+
+    x_test = np.pad(
+        x_test, ((0, 0), (2, 2), (2, 2)), mode="constant", constant_values=0
+    )
 
     x_test = x_test / 255.0
 
-    x_test = x_test.reshape(x_test.shape[0], 32, 32, 3)
-
+    x_test = x_test.reshape(x_test.shape[0], 32, 32, 1)
     y_test = y_test.astype("float32")
-
-    # pad images to 32x32
-    # x_test = np.pad(
-    #     x_test, ((0, 0), (2, 2), (2, 2)), mode="constant", constant_values=0
-    # )
-
-    # n = int(np.sqrt(patches.shape[1]))
-    # plt.figure(figsize=(4, 4))
-    # for i, patch in enumerate(patches[0]):
-    #     ax = plt.subplot(n, n, i + 1)
-    #     patch_img = tf.reshape(patch, (patch_size, patch_size))
-    #     plt.imshow(patch_img.numpy().astype("uint8"))
-    #     plt.axis("off")
+    x_test = x_test.reshape(x_test.shape[0], 32, 32, 1)
 
     # plt.show()
 
-    # model = create_vit_classifier(
-    #     input_shape=(32, 32, 1),
-    #     num_classes=10,
-    #     patch_size=4,
-    #     num_patches=64,
-    #     projection_dim=16,
-    #     transformer_layers=1,
-    #     num_heads=2,
-    #     transformer_units=[16],
-    #     mlp_head_units=[32],
-    # )
 
     model = ViT(
-        image_size=(32, 32, 3),
+        image_size=(32, 32, 1),
         patch_size=4,
-        num_layers=4,
-        hidden_size=64,
-        num_heads=4,
+        num_layers=2,
+        hidden_size=16,
+        num_heads=2,
         name="vit",
-        mlp_dim=64,
+        mlp_dim=16,
         classes=10,
         dropout=0.1,
         activation="linear",
-        representation_size=32,
+        representation_size=16,
     )
+
 
     optimizer = keras.optimizers.Adam(learning_rate=0.0005)
     model.compile(
@@ -425,7 +408,7 @@ def run_experiment():
     )
 
     # summarize the model
-    model.build((None, 32, 32, 3))
+    model.build((None, 32, 32, 1))
     model.summary()
 
     _ = model.predict(x_train[:1])
@@ -434,6 +417,7 @@ def run_experiment():
     attention = attention_map(model, x_train[0])
     plt.matshow(attention.reshape(32, 32), cmap="viridis")
     plt.show()
+
 
     # for each image resize it to 32x32
     # x_train = tf.image.resize(x_train[..., tf.newaxis], (32, 32)).numpy()
@@ -446,25 +430,45 @@ def run_experiment():
     #print(attentions)
 
     callbacks = [
-        keras.callbacks.LearningRateScheduler(lambda epoch: 0.01 * 0.92 ** (epoch))
+        keras.callbacks.LearningRateScheduler(lambda epoch: 0.001 * 0.92 ** (epoch))
     ]
 
-    model.fit(x_train, y_train, batch_size=128, epochs=150, callbacks=callbacks)
+    model.fit(x_train, y_train, batch_size=128, epochs=1, callbacks=callbacks)
     _, accuracy = model.evaluate(x_test, y_test)
 
-    plt.imshow(x_train[:1].reshape(32, 32, 3), cmap="gray")
+    # plot x_train[:1]
+    plt.imshow(x_train[:1].reshape(32, 32, 1), cmap="gray")
     
-
+    # attention map is of shape (1, 1, 2, 64, 64)
     attention = attention_map(model, x_train[0])
-
+    # plot attention maps ((32, 32, 1))
     plt.matshow(attention.reshape(32, 32), cmap="viridis")
     plt.show()
+
+    # attentions = attentions[0][0]
+
+    # # print(attentions.shape) (2, 64, 64)
+    # # dimensions are (num_heads, num_patches, num_patches)
+    # # calucalte average attention across heads and reshape to 8x8 grid
+    # avg_attentions = tf.reduce_mean(attentions, axis=0)
+    # # shape is now (64, 64)
+    # # average attention for each patch
+    # avg_attentions = tf.reduce_mean(avg_attentions, axis=0)
+    # # shape is now (64,)
+    # # reshape to 8x8 grid
+    # avg_attentions = tf.reshape(avg_attentions, (8, 8))
+    # # plot
+    # plt.matshow(avg_attentions, cmap="viridis")
+
+    # plt.show()
+
+    # print(attentions)
 
     # save
     print(f"Test accuracy: {round(accuracy * 100, 2)}%")
 
 
-    model.save("vit_cifar100")
+    model.save("mints10")
 
 
 if __name__ == "__main__":
