@@ -1,11 +1,11 @@
-import tensorflow as tf
-from tensorflow import keras
-import keras.layers
-import keras.activations
-import keras.optimizers
-import keras
+import tensorflow as tf        
+from tensorflow import keras   
+import keras.layers            
+import keras.activations       
+import keras.optimizers        
+import keras                   
 import matplotlib.pyplot as plt
-import VisualTransformer
+import VisualTransformer       
 
 
 def run_experiment():
