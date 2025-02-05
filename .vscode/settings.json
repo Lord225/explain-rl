@@ -1,0 +1,7 @@
+{
+    "python.analysis.extraPaths": [
+        "~/.local/virtual-site-packages",
+        "~/miniconda3/lib",
+        "./procgen-custom/procgen"
+    ]
+}
