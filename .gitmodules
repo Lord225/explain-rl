@@ -1,3 +1,0 @@
-[submodule "ppo"]
-	path = ppo-repo
-	url = https://github.com/Lord225/ppo
