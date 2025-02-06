@@ -29,7 +29,7 @@ env = enviroments.ProcGenWrapper("starpilot", 1, False, 3)
 params = argparse.Namespace()
 
 params.env_name = env.env
-params.version = "v6.1"
+params.version = "v1"
 params.DRY_RUN = False
 
 params.actor_lr  = 1e-4
@@ -52,13 +52,13 @@ params.clip_ratio = 0.20
 params.lam = 0.98
 
 # params.curius_coef = 0.013
-params.curius_coef = 0.0001
+params.curius_coef = 0.01
 
 params.batch_size = 4096
-params.batch_size_curius = 300
+params.batch_size_curius = 128
 
 params.train_interval = 1
-params.iters = 20
+params.iters = 10
 params.iters_courious = 30
 
 params.save_freq = 1000
@@ -125,58 +125,78 @@ def get_curiosity_autoencoder():
         print("loaded model from", args.resume)
         return encoder, autoencoder
     
-
-    observation_input = tf.keras.Input(shape=params.observation_space, dtype=tf.int8)
-    x = tf.cast(observation_input, tf.float32)
-    x = x / 255.0 # type: ignore
-    x = tf.keras.layers.Conv2D(32, 3, strides=2, activation=tf.nn.elu)(x)
-    x = tf.keras.layers.Conv2D(32, 3, strides=2, activation=tf.nn.elu)(x)
-    x = tf.keras.layers.Conv2D(16, 3, strides=2, activation=tf.nn.elu)(x)
-    x = tf.keras.layers.Conv2D(16, 3, strides=2, padding='same', activation=tf.nn.elu)(x)
-    x = tf.keras.layers.Flatten()(x)
-    x = tf.keras.layers.Dense(128, activation=tf.nn.elu)(x)
+    class CVAE(tf.keras.Model):
     
-    z_mean = tf.keras.layers.Dense(params.encoding_size, name='z_mean')(x)
-    z_log_var = tf.keras.layers.Dense(params.encoding_size, name='z_log_var')(x)
+        def __init__(self, latent_dim):
+            super(CVAE, self).__init__()
+            self.latent_dim = latent_dim
+            self.encoder = tf.keras.Sequential(
+                [
+                    tf.keras.layers.InputLayer(input_shape=(64, 64, 9)),
+                    tf.keras.layers.Conv2D(filters=8, kernel_size=3, strides=(2, 2), activation='relu'),
+                    tf.keras.layers.Conv2D(filters=16, kernel_size=3, strides=(2, 2), activation='relu'),
+                    tf.keras.layers.Conv2D(filters=32, kernel_size=3, strides=(2, 2), activation='relu'),
+                    tf.keras.layers.Conv2D(filters=32, kernel_size=3, strides=(2, 2), activation='relu'),
+                    tf.keras.layers.Flatten(),
+                    tf.keras.layers.Dense(128, activation='relu'),
+                    tf.keras.layers.Dense(latent_dim * 2, name='latent_space'),
+                ]
+            )
 
-    def sampling(args):
-        z_mean, z_log_var = args
-        batch = tf.shape(z_mean)[0]
-        dim = tf.shape(z_mean)[1]
-        epsilon = tf.keras.backend.random_normal(shape=(batch, dim))
-        return z_mean + tf.exp(0.5 * z_log_var) * epsilon
+            self.decoder = tf.keras.Sequential(
+                [
+                    tf.keras.layers.InputLayer(input_shape=(128,)),
+                    tf.keras.layers.Dense(units=2*2*32, activation=tf.nn.relu),
+                    tf.keras.layers.Reshape(target_shape=(2, 2, 32)),
+                    tf.keras.layers.Conv2DTranspose(filters=32, kernel_size=3, strides=2, padding='same', activation='relu'),
+                    tf.keras.layers.Conv2DTranspose(filters=32, kernel_size=3, strides=2, padding='same', activation='relu'),
+                    tf.keras.layers.Conv2DTranspose(filters=32, kernel_size=3, strides=2, padding='same', activation='relu'),
+                    tf.keras.layers.Conv2DTranspose(filters=16, kernel_size=3, strides=2, padding='same', activation='relu'),
+                    tf.keras.layers.Conv2DTranspose(filters=16, kernel_size=3, strides=2, padding='same', activation='relu'),
+                    tf.keras.layers.Conv2DTranspose(filters=9, kernel_size=3, strides=1, padding='same'),
+                ]
+            )
 
-    z = tf.keras.layers.Lambda(sampling, output_shape=(params.encoding_size,), name='z')([z_mean, z_log_var])
+        @tf.function
+        def sample(self, eps=None):
+            if eps is None:
+                eps = tf.random.normal(shape=(100, self.latent_dim))
+            return self.decode(eps, apply_sigmoid=True)
 
-    encoder_model = tf.keras.Model(inputs=observation_input, outputs=z, name='encoder')
+        def encode(self, x):
+            mean, logvar = tf.split(self.encoder(x), num_or_size_splits=2, axis=1)
+            return mean, logvar
 
-    latent_inputs = tf.keras.Input(shape=(params.encoding_size,), dtype=tf.float32)
-    x = tf.keras.layers.Dense(64, activation=tf.nn.elu)(latent_inputs)
-    x = tf.keras.layers.Dense(32, activation=tf.nn.elu)(x)
-    x = tf.keras.layers.Reshape((1, 1, 32))(x)
-    x = tf.keras.layers.Conv2DTranspose(32, 3, strides=2, activation=tf.nn.elu)(x)
-    x = tf.keras.layers.Conv2DTranspose(32, 3, strides=2, activation=tf.nn.elu)(x)
-    x = tf.keras.layers.Conv2DTranspose(16, 3, strides=2, activation=tf.nn.elu)(x)
-    x = tf.keras.layers.Conv2D(16, 3, strides=1, padding='same', activation=tf.nn.elu)(x)
-    x = tf.keras.layers.Conv2D(8, 3, strides=1, padding='same', activation=tf.nn.elu)(x)
-    x = tf.keras.layers.Conv2D(6, 3, strides=1, padding='same', activation=tf.nn.elu)(x)
+        def reparameterize(self, mean, logvar):
+            eps = tf.random.normal(shape=mean.shape)
+            return eps * tf.exp(logvar * .5) + mean
 
-    autoencoder_model = tf.keras.Model(inputs=[observation_input, latent_inputs], outputs=x, name='autoencoder')
+        def decode(self, z, apply_sigmoid=False):
+            logits = self.decoder(z)
+            if apply_sigmoid:
+                probs = tf.sigmoid(logits)
+                return probs
+            return logits
 
-    def vae_loss(observation_input, x):
-        reconstruction_loss = tf.keras.losses.mse(tf.keras.backend.flatten(observation_input), tf.keras.backend.flatten(x))
-        reconstruction_loss *= params.observation_space[0] * params.observation_space[1]
-        kl_loss = 1 + z_log_var - tf.square(z_mean) - tf.exp(z_log_var)
-        kl_loss = tf.keras.backend.sum(kl_loss, axis=-1)
-        kl_loss *= -0.5
-        return tf.keras.backend.mean(reconstruction_loss + kl_loss)
+        def call(self, inputs):
+            mean, logvar = self.encode(inputs)
+            z = self.reparameterize(mean, logvar)
+            return self.decode(z)
 
-    autoencoder_model.add_loss(vae_loss(observation_input, x))
-    autoencoder_model.compile(optimizer='adam')
+    latent_dim = params.encoding_size
+    autoencoder = CVAE(latent_dim)
 
-    autoencoder_model.summary()
+    autoencoder.compile(optimizer=tf.keras.optimizers.Adam())
 
-    return encoder_model, autoencoder_model
+    latent_output = autoencoder.encoder.get_layer('latent_space').output # 256 - 128 for mean and 128 for logvar
+    encoder = tf.keras.Model(inputs=autoencoder.encoder.input, outputs=latent_output[:, :latent_dim], name='encoder')
+
+    # Build the autoencoder model by calling it on a batch of data
+    autoencoder(tf.random.normal([1, 64, 64, 9]))
+    autoencoder.summary()
+    encoder.summary()
+
+    return encoder, autoencoder
 
 def get_curiosity():
     if args.resume is not None:

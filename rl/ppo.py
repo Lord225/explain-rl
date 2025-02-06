@@ -310,7 +310,7 @@ def training_step_curiosty(
 
 
 
-@tf.function
+#@tf.function
 def training_step_autoencoder(
     batch,
     autoencoder,
@@ -322,7 +322,7 @@ def training_step_autoencoder(
     # train autoencoder
 
     with tf.GradientTape() as tape:
-        loss = tf.reduce_mean(tf.square(observation_buffer - autoencoder(observation_buffer)))
+        loss = tf.reduce_mean(tf.square((tf.cast(observation_buffer, tf.float32)/255.0) - autoencoder(observation_buffer)))
 
     gradients = tape.gradient(loss, autoencoder.trainable_variables)
     optimizer.apply_gradients(zip(gradients, autoencoder.trainable_variables))
