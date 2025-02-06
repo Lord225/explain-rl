@@ -1,9 +1,6 @@
-from argparse import Namespace
-import stat
 import tensorflow as tf
-from typing import Callable, List, Tuple, Union,NamedTuple
 from tensorboard.plugins.hparams import api as hp
-from common import HistorySampleType, HistorySampleCriticType, HistorySampleCuriosityType
+from .common import HistorySampleType, HistorySampleCriticType, HistorySampleCuriosityType
 
 @tf.function
 def discounted_cumulative_sums_tf(x, discount_rate)-> tf.Tensor:
@@ -25,7 +22,7 @@ class PPOReplayMemory:
         if next_state_shape is None:
             next_state_shape = states_shape
         
-        self.states_buffer = tf.Variable(tf.zeros(states_shape,  dtype=tf.float32), trainable=False, dtype=tf.float32)
+        self.states_buffer = tf.Variable(tf.zeros(states_shape,  dtype=tf.int8), trainable=False, dtype=tf.int8)
         self.advantages_buffer = tf.Variable(tf.zeros((max_size),  dtype=tf.float32), trainable=False, dtype=tf.float32)
         self.actions_buffer = tf.Variable(tf.zeros((max_size), dtype=tf.int32), trainable=False, dtype=tf.int32)
         self.rewards_buffer = tf.Variable(tf.zeros((max_size),  dtype=tf.float32), trainable=False, dtype=tf.float32)
@@ -33,7 +30,7 @@ class PPOReplayMemory:
         self.logprobability_buffer = tf.Variable(tf.zeros((max_size),  dtype=tf.float32), trainable=False, dtype=tf.float32)
 
         if gather_next_states:
-            self.next_states_buffer = tf.Variable(tf.zeros(next_state_shape, dtype=tf.float32), trainable=False, dtype=tf.float32)
+            self.next_states_buffer = tf.Variable(tf.zeros(next_state_shape, dtype=tf.int8), trainable=False, dtype=tf.int8)
         else:
             self.next_states_buffer = None
 
@@ -49,7 +46,7 @@ class PPOReplayMemory:
 
     
     @tf.function(reduce_retracing=True)
-    def add_tf(self, states, actions, rewards, values, logprobabilities,
+    def add_tf(self, states, actions, rewards, values, logprobabilities, next_states,
                states_buffer, advantages_buffer, actions_buffer, rewards_buffer, return_buffer, logprobability_buffer, next_states_buffer,
                gamma, lam, max_size, count):
         
@@ -62,7 +59,7 @@ class PPOReplayMemory:
         logprobability_buffer = tf.tensor_scatter_nd_update(logprobability_buffer, indices[:, None], logprobabilities)
 
         if next_states_buffer is not None:
-            next_states_buffer = tf.tensor_scatter_nd_update(next_states_buffer, indices[:, None], states)
+            next_states_buffer = tf.tensor_scatter_nd_update(next_states_buffer, indices[:, None], next_states)
         
         count = (count + size) % max_size
 
@@ -85,7 +82,7 @@ class PPOReplayMemory:
         return states_buffer, advantages_buffer, actions_buffer, rewards_buffer, return_buffer, logprobability_buffer, next_states_buffer, count
         
 
-    def add(self, observations, actions, rewards, values, logprobabilities, next_observations=None):
+    def add(self, observations, actions, rewards, values, logprobabilities, next_states):
         count = tf.constant(self.count, dtype=tf.int32)
         max_size = tf.constant(self.max_size, dtype=tf.int32)
         gamma = tf.constant(self.gamma, dtype=tf.float32)
@@ -97,6 +94,7 @@ class PPOReplayMemory:
                     rewards, 
                     values, 
                     logprobabilities,
+                    next_states,
                     self.states_buffer, 
                     self.advantages_buffer, 
                     self.actions_buffer, 
@@ -239,9 +237,94 @@ def training_step_ppo(batch,
     return kl, policy_loss, mean_ratio, mean_clipped_ratio, mean_advantage, mean_logprob
 
 
-    
-import unittest
 
-# run test if main
-if __name__ == '__main__':
-    unittest.main()
+@tf.function
+def training_step_critic(
+        batch,
+        critic,
+        optimizer: tf.keras.optimizers.Optimizer,
+        step: int
+):
+    observation_buffer, target_buffer = batch
+    with tf.GradientTape() as tape:
+        values = critic(observation_buffer)
+        loss = tf.reduce_mean(tf.square(target_buffer - values))
+
+    gradients = tape.gradient(loss, critic.trainable_variables)
+    optimizer.apply_gradients(zip(gradients, critic.trainable_variables))
+
+    tf.summary.scalar('critic_loss', loss, step=step) # type: ignore
+
+#@tf.function
+def training_step_critic_selfplay(
+        batch1,
+        batch2,
+        critic,
+        optimizer: tf.keras.optimizers.Optimizer,
+        step: int
+):
+    #observation_buffer, target_buffer = batch
+    observation_bufferp1, target_bufferp1 = batch1
+    observation_bufferp2, target_bufferp2 = batch2
+
+    # mix two batches and add new buffer that will contain 0 for player 1 and 1 for player 2
+    observation_buffer = tf.concat([observation_bufferp1, observation_bufferp2], axis=0)
+    target_buffer = tf.concat([target_bufferp1, target_bufferp2], axis=0)
+    # create new buffer that will contain 0 for player 1 and 1 for player 2, (batchsize,)
+    batchsize1 = tf.shape(observation_bufferp1)[0]
+    batchsize2 = tf.shape(observation_bufferp2)[0]
+    player_buffer = tf.concat([tf.zeros((batchsize1, 1)), tf.ones((batchsize2, 1))], axis=0)
+
+
+    
+    with tf.GradientTape() as tape:
+        values = critic(observation_buffer)
+        loss = tf.reduce_mean(tf.square(target_buffer - values))
+
+        gradients = tape.gradient(loss, critic.trainable_variables)
+        optimizer.apply_gradients(zip(gradients, critic.trainable_variables))
+
+    #tf.summary.scalar('critic_loss', loss, step=step) # type: ignore
+
+    return tf.reduce_mean(loss)
+
+@tf.function
+def training_step_curiosty(
+        batch,
+        curiosity,
+        optimizer: tf.keras.optimizers.Optimizer,
+        num_of_actions,
+        step: int
+):
+    observation_buffer, action_buffer, next_observation_buffer = batch
+
+    action_buffer = tf.one_hot(action_buffer, num_of_actions, dtype=tf.float32)
+
+    with tf.GradientTape() as tape:
+        loss = tf.reduce_mean(tf.square(next_observation_buffer - curiosity([observation_buffer, action_buffer])))
+
+    gradients = tape.gradient(loss, curiosity.trainable_variables)
+    optimizer.apply_gradients(zip(gradients, curiosity.trainable_variables))
+
+    tf.summary.scalar('curiosity_loss', loss, step=step) # type: ignore
+
+
+
+@tf.function
+def training_step_autoencoder(
+    batch,
+    autoencoder,
+    optimizer: tf.keras.optimizers.Optimizer,
+    step: int
+):
+    observation_buffer = batch
+
+    # train autoencoder
+
+    with tf.GradientTape() as tape:
+        loss = tf.reduce_mean(tf.square(observation_buffer - autoencoder(observation_buffer)))
+
+    gradients = tape.gradient(loss, autoencoder.trainable_variables)
+    optimizer.apply_gradients(zip(gradients, autoencoder.trainable_variables))
+
+    tf.summary.scalar('autoencoder_loss', loss, step=step) # type: ignore

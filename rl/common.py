@@ -49,7 +49,7 @@ class EnvStepReturnType(NamedTuple):
 EnvStepType = Callable[[tf.Tensor], EnvStepReturnType]
 
 import datetime
-import config
+from rl import config
 
 def splash_screen(params: Namespace):
     print(r"""
