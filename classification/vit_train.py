@@ -7,7 +7,7 @@ import keras
 import matplotlib.pyplot as plt
 import sys
 sys.path.append('./../')
-import VisualTransformer
+import advanced_networks.VisualTransformer as VisualTransformer
 
 
 def run_experiment():

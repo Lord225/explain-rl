@@ -28,17 +28,18 @@ env_mono.callmethod("set_state", states)
 step = 0
 while True:
     action = types_np.sample(env_mono.ac_space, bshape=(env_mono.num,))    
+    print(action)
     env_mono.act(action)
     env_normal.act(action)
     rew, obs, first = env_mono.observe()
     rew2, obs2, first2 = env_normal.observe()
     
-    print(obs)
+    print(obs['rgb'].shape)
     plt.subplot(1, 2, 1)
     plt.imshow(obs['rgb'][0])
     plt.title('Monochrome')
 
-    print(obs2)
+    print(obs2['rgb'].shape)
     plt.subplot(1, 2, 2)
     plt.imshow(obs2['rgb'][0])
     plt.title('Normal')
