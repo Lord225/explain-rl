@@ -91,7 +91,7 @@ def run_experiment():
         keras.callbacks.LearningRateScheduler(lambda epoch: 0.001 * 0.92 ** (epoch))
     ]
 
-    model.fit(train, batch_size=128, epochs=5, callbacks=callbacks)
+    model.fit(train, batch_size=128, epochs=1, callbacks=callbacks)
     _, accuracy = model.evaluate(x_test, y_test)
 
     plt.imshow(x_test[:1].reshape(32, 32, 3), cmap="gray")
@@ -100,7 +100,7 @@ def run_experiment():
     print(f"Test accuracy: {round(accuracy * 100, 2)}%")
 
     # save model as cnn_cifar10
-    model.save("F:/pyrepos/explain-rl/cnn_cifar10")
+    model.save("./cnn_cifar10")
 
 
 if __name__ == "__main__":
