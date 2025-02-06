@@ -5,7 +5,9 @@ import keras.activations
 import keras.optimizers        
 import keras                   
 import matplotlib.pyplot as plt
-import VisualTransformer       
+import sys
+sys.path.append('./../')
+import VisualTransformer
 
 
 def run_experiment():

@@ -5,8 +5,10 @@ import keras.layers
 import keras.activations
 import keras.optimizers
 import keras
-import VisualTransformer 
 import matplotlib.pyplot as plt
+import sys
+sys.path.append('./../')
+import VisualTransformer
 
 def run_experiment():
     AUTOTUNE = tf.data.experimental.AUTOTUNE
