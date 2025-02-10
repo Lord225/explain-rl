@@ -318,11 +318,10 @@ def training_step_autoencoder(
     step: int
 ):
     observation_buffer = batch
-
-    # train autoencoder
+    observation_buffer = tf.cast(observation_buffer, tf.float32) / 255.0
 
     with tf.GradientTape() as tape:
-        loss = tf.reduce_mean(tf.square((tf.cast(observation_buffer, tf.float32)/255.0) - autoencoder(observation_buffer)))
+        loss = tf.reduce_mean(tf.square(observation_buffer - autoencoder(observation_buffer)))
 
     gradients = tape.gradient(loss, autoencoder.trainable_variables)
     optimizer.apply_gradients(zip(gradients, autoencoder.trainable_variables))

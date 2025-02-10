@@ -1,7 +1,6 @@
 # Vanilla PPO with curiosity
 
 from collections import deque
-import gymnasium
 import tensorflow as tf
 import tensorboard
 import os
@@ -15,16 +14,12 @@ import rl.enviroment as enviroments
 import os
 import numpy as np
 
-
-
-
-
 parser = argparse.ArgumentParser()
 parser.add_argument("--resume", type=str, default=None, help="resume from a model") 
 
 args = parser.parse_args()
 
-env = enviroments.ProcGenWrapper("starpilot", 1, False, 3)
+env = enviroments.ProcGenWrapper("caveflyer", 1, False, 3)
 
 params = argparse.Namespace()
 
@@ -32,13 +27,13 @@ params.env_name = env.env
 params.version = "v1"
 params.DRY_RUN = False
 
-params.actor_lr  = 1e-4
-params.critic_lr = 1e-3
+params.actor_lr  = 1e-5
+params.critic_lr = 1e-4
 
 params.action_space = 15
 params.observation_space_raw =  (64, 64, 9)
 params.observation_space = (64, 64, 9)
-params.encoding_size = 128
+params.encoding_size = 64
 
 params.episodes = 100000
 params.max_steps_per_episode = 1200
@@ -52,14 +47,14 @@ params.clip_ratio = 0.20
 params.lam = 0.98
 
 # params.curius_coef = 0.013
-params.curius_coef = 0.01
+params.curius_coef = 0.00001
 
-params.batch_size = 4096
+params.batch_size = 1024
 params.batch_size_curius = 128
 
-params.train_interval = 1
-params.iters = 10
-params.iters_courious = 30
+params.train_interval = 100
+params.iters = 100
+params.iters_courious = 200
 
 params.save_freq = 1000
 if args.resume is not None:
@@ -76,11 +71,11 @@ def get_actor():
     observation_input = tf.keras.Input(shape=params.observation_space, dtype=tf.int8)
     x = tf.cast(observation_input, tf.float32)
     x = x / 255.0 # type: ignore
-    x = tf.keras.layers.Conv2D(32, 3, strides=2, activation=tf.nn.elu)(x)
-    x = tf.keras.layers.Conv2D(64, 3, strides=2, activation=tf.nn.elu)(x)
-    x = tf.keras.layers.Conv2D(64, 2, strides=2, activation=tf.nn.elu)(x)
-    x = tf.keras.layers.Conv2D(64, 2, strides=2, activation=tf.nn.elu)(x)
-    x = tf.keras.layers.Conv2D(64, 2, strides=2, activation=tf.nn.elu)(x)
+    x = tf.keras.layers.Conv2D(8, 3, strides=2, activation=tf.nn.elu)(x)
+    x = tf.keras.layers.Conv2D(16, 3, strides=2, activation=tf.nn.elu)(x)
+    x = tf.keras.layers.Conv2D(16, 2, strides=2, activation=tf.nn.elu)(x)
+    x = tf.keras.layers.Conv2D(16, 2, strides=2, activation=tf.nn.elu)(x)
+    x = tf.keras.layers.Conv2D(16, 2, strides=2, activation=tf.nn.elu)(x)
     x = tf.keras.layers.Flatten()(x)
     x = tf.keras.layers.Dense(32, activation=tf.nn.elu)(x)
     x = tf.keras.layers.Dense(32, activation=tf.nn.elu)(x)
@@ -103,13 +98,13 @@ def get_critic():
     observation_input = tf.keras.Input(shape=params.observation_space, dtype=tf.int8)
     x = tf.cast(observation_input, tf.float32)
     x = x / 255.0 # type: ignore
-    x = tf.keras.layers.Conv2D(32, 3, strides=2, activation=tf.nn.elu)(x)
+    x = tf.keras.layers.Conv2D(16, 3, strides=2, activation=tf.nn.elu)(x)
     x = tf.keras.layers.MaxPooling2D()(x)
-    x = tf.keras.layers.Conv2D(32, 3, strides=2, activation=tf.nn.elu)(x)
+    x = tf.keras.layers.Conv2D(16, 3, strides=2, activation=tf.nn.elu)(x)
     x = tf.keras.layers.MaxPooling2D()(x)
     x = tf.keras.layers.Conv2D(16, 3, strides=2, activation=tf.nn.elu)(x)
     x = tf.keras.layers.Flatten()(x)
-    x = tf.keras.layers.Dense(64, activation=tf.nn.elu)(x)
+    x = tf.keras.layers.Dense(16, activation=tf.nn.elu)(x)
     x = tf.keras.layers.Dense(16, activation=tf.nn.elu)(x)
 
 
@@ -126,34 +121,34 @@ def get_curiosity_autoencoder():
         return encoder, autoencoder
     
     class CVAE(tf.keras.Model):
-    
         def __init__(self, latent_dim):
             super(CVAE, self).__init__()
             self.latent_dim = latent_dim
             self.encoder = tf.keras.Sequential(
                 [
                     tf.keras.layers.InputLayer(input_shape=(64, 64, 9)),
-                    tf.keras.layers.Conv2D(filters=8, kernel_size=3, strides=(2, 2), activation='relu'),
-                    tf.keras.layers.Conv2D(filters=16, kernel_size=3, strides=(2, 2), activation='relu'),
-                    tf.keras.layers.Conv2D(filters=32, kernel_size=3, strides=(2, 2), activation='relu'),
-                    tf.keras.layers.Conv2D(filters=32, kernel_size=3, strides=(2, 2), activation='relu'),
+                    tf.keras.layers.Lambda(lambda x: tf.cast(x, tf.float32) / 255.0),
+                    tf.keras.layers.Conv2D(filters=8, kernel_size=2, strides=(2, 2), activation='relu'),
+                    tf.keras.layers.Conv2D(filters=16, kernel_size=2, strides=(2, 2), activation='relu'),
+                    tf.keras.layers.Conv2D(filters=16, kernel_size=2, strides=(2, 2), activation='relu'),
+                    tf.keras.layers.Conv2D(filters=16, kernel_size=2, strides=(2, 2), activation='relu'),
                     tf.keras.layers.Flatten(),
-                    tf.keras.layers.Dense(128, activation='relu'),
+                    tf.keras.layers.Dense(64, activation='relu'),
                     tf.keras.layers.Dense(latent_dim * 2, name='latent_space'),
                 ]
             )
 
             self.decoder = tf.keras.Sequential(
                 [
-                    tf.keras.layers.InputLayer(input_shape=(128,)),
+                    tf.keras.layers.InputLayer(input_shape=(64,)),
                     tf.keras.layers.Dense(units=2*2*32, activation=tf.nn.relu),
                     tf.keras.layers.Reshape(target_shape=(2, 2, 32)),
-                    tf.keras.layers.Conv2DTranspose(filters=32, kernel_size=3, strides=2, padding='same', activation='relu'),
-                    tf.keras.layers.Conv2DTranspose(filters=32, kernel_size=3, strides=2, padding='same', activation='relu'),
-                    tf.keras.layers.Conv2DTranspose(filters=32, kernel_size=3, strides=2, padding='same', activation='relu'),
-                    tf.keras.layers.Conv2DTranspose(filters=16, kernel_size=3, strides=2, padding='same', activation='relu'),
-                    tf.keras.layers.Conv2DTranspose(filters=16, kernel_size=3, strides=2, padding='same', activation='relu'),
-                    tf.keras.layers.Conv2DTranspose(filters=9, kernel_size=3, strides=1, padding='same'),
+                    tf.keras.layers.Conv2DTranspose(filters=16, kernel_size=2, strides=2, padding='same', activation='relu'),
+                    tf.keras.layers.Conv2DTranspose(filters=16, kernel_size=2, strides=2, padding='same', activation='relu'),
+                    tf.keras.layers.Conv2DTranspose(filters=16, kernel_size=2, strides=2, padding='same', activation='relu'),
+                    tf.keras.layers.Conv2DTranspose(filters=16, kernel_size=2, strides=2, padding='same', activation='relu'),
+                    tf.keras.layers.Conv2DTranspose(filters=16, kernel_size=2, strides=2, padding='same', activation='relu'),
+                    tf.keras.layers.Conv2DTranspose(filters=9, kernel_size=2, strides=1, padding='same', activation='sigmoid'),
                 ]
             )
 
@@ -168,7 +163,9 @@ def get_curiosity_autoencoder():
             return mean, logvar
 
         def reparameterize(self, mean, logvar):
-            eps = tf.random.normal(shape=mean.shape)
+            batch = tf.shape(mean)[0]
+            dim = tf.shape(mean)[1]
+            eps = tf.random.normal(shape=(batch, dim))
             return eps * tf.exp(logvar * .5) + mean
 
         def decode(self, z, apply_sigmoid=False):
@@ -241,7 +238,7 @@ def log_stats(stats, step):
 def run():
     running_avg = deque(maxlen=200)
 
-    memory = ppo.PPOReplayMemory(16_000, params.observation_space, gamma=params.discount_rate, lam=params.lam, gather_next_states=True)
+    memory = ppo.PPOReplayMemory(8_000, params.observation_space, gamma=params.discount_rate, lam=params.lam, gather_next_states=True)
 
     env_step = enviroments.make_tensorflow_env_step(env, lambda x: x) # type: ignore
     env_reset = enviroments.make_tensorflow_env_reset(env, lambda x: x) # type: ignore
@@ -283,7 +280,7 @@ def run():
 
         episode_tf = tf.constant(episode, dtype=tf.int64)
 
-        if len(memory) >= batch_size and int(episode) % params.train_interval == 0:
+        if len(memory) >= batch_size and int(episode) % params.train_interval == 0 and int(episode) > 0:
             stats = [] # kl, policy_loss, mean_ratio, mean_clipped_ratio, mean_advantage, mean_logprob
             for _ in range(params.iters):
                 batch = memory.sample(batch_size)
@@ -306,15 +303,13 @@ def run():
 
             # memory.reset()
 
-
-
-        if episode % params.save_freq == 0 and episode > 0: 
-            NAME = f"{config.MODELS_DIR}{params.env_name}{params.version}_{config.RUN_NAME}_{episode}"
+        if episode % params.save_freq == 0 and episode > 0:
+            NAME = f"{config.MODELS_DIR}{params.env_name}-{params.version}_{config.RUN_NAME}/{episode}/"
             
-            actor.save(f"{NAME}.actor.h5") # type: ignore
-            critic.save(f"{NAME}.critic.h5") # type: ignore
-            curiosity.save(f"{NAME}.curiosity.h5") # type: ignore
-            autoencoder.save(f"{NAME}.autoencoder.h5") # type: ignore
+            actor.save(f"{NAME}actor", save_format="tf") # type: ignore
+            critic.save(f"{NAME}critic", save_format="tf") # type: ignore
+            curiosity.save(f"{NAME}curiosity", save_format="tf") # type: ignore
+            autoencoder.save(f"{NAME}autoencoder", save_format="tf") # type: ignore
 
 run()
 
