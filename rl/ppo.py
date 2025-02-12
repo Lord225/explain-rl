@@ -22,15 +22,16 @@ class PPOReplayMemory:
         if next_state_shape is None:
             next_state_shape = states_shape
         
-        self.states_buffer = tf.Variable(tf.zeros(states_shape,  dtype=tf.int8), trainable=False, dtype=tf.int8)
-        self.advantages_buffer = tf.Variable(tf.zeros((max_size),  dtype=tf.float32), trainable=False, dtype=tf.float32)
-        self.actions_buffer = tf.Variable(tf.zeros((max_size), dtype=tf.int32), trainable=False, dtype=tf.int32)
-        self.rewards_buffer = tf.Variable(tf.zeros((max_size),  dtype=tf.float32), trainable=False, dtype=tf.float32)
-        self.return_buffer = tf.Variable(tf.zeros((max_size),  dtype=tf.float32), trainable=False, dtype=tf.float32)
-        self.logprobability_buffer = tf.Variable(tf.zeros((max_size),  dtype=tf.float32), trainable=False, dtype=tf.float32)
+        with tf.device('/CPU:0'):
+            self.states_buffer = tf.Variable(tf.zeros(states_shape,  dtype=tf.uint8), trainable=False, dtype=tf.uint8)
+            self.advantages_buffer = tf.Variable(tf.zeros((max_size),  dtype=tf.float32), trainable=False, dtype=tf.float32)
+            self.actions_buffer = tf.Variable(tf.zeros((max_size), dtype=tf.int32), trainable=False, dtype=tf.int32)
+            self.rewards_buffer = tf.Variable(tf.zeros((max_size),  dtype=tf.float32), trainable=False, dtype=tf.float32)
+            self.return_buffer = tf.Variable(tf.zeros((max_size),  dtype=tf.float32), trainable=False, dtype=tf.float32)
+            self.logprobability_buffer = tf.Variable(tf.zeros((max_size),  dtype=tf.float32), trainable=False, dtype=tf.float32)
 
         if gather_next_states:
-            self.next_states_buffer = tf.Variable(tf.zeros(next_state_shape, dtype=tf.int8), trainable=False, dtype=tf.int8)
+            self.next_states_buffer = tf.Variable(tf.zeros(next_state_shape, dtype=tf.uint8), trainable=False, dtype=tf.uint8)
         else:
             self.next_states_buffer = None
 
@@ -253,40 +254,8 @@ def training_step_critic(
     gradients = tape.gradient(loss, critic.trainable_variables)
     optimizer.apply_gradients(zip(gradients, critic.trainable_variables))
 
-    tf.summary.scalar('critic_loss', loss, step=step) # type: ignore
-
-#@tf.function
-def training_step_critic_selfplay(
-        batch1,
-        batch2,
-        critic,
-        optimizer: tf.keras.optimizers.Optimizer,
-        step: int
-):
-    #observation_buffer, target_buffer = batch
-    observation_bufferp1, target_bufferp1 = batch1
-    observation_bufferp2, target_bufferp2 = batch2
-
-    # mix two batches and add new buffer that will contain 0 for player 1 and 1 for player 2
-    observation_buffer = tf.concat([observation_bufferp1, observation_bufferp2], axis=0)
-    target_buffer = tf.concat([target_bufferp1, target_bufferp2], axis=0)
-    # create new buffer that will contain 0 for player 1 and 1 for player 2, (batchsize,)
-    batchsize1 = tf.shape(observation_bufferp1)[0]
-    batchsize2 = tf.shape(observation_bufferp2)[0]
-    player_buffer = tf.concat([tf.zeros((batchsize1, 1)), tf.ones((batchsize2, 1))], axis=0)
-
-
-    
-    with tf.GradientTape() as tape:
-        values = critic(observation_buffer)
-        loss = tf.reduce_mean(tf.square(target_buffer - values))
-
-        gradients = tape.gradient(loss, critic.trainable_variables)
-        optimizer.apply_gradients(zip(gradients, critic.trainable_variables))
-
-    #tf.summary.scalar('critic_loss', loss, step=step) # type: ignore
-
     return tf.reduce_mean(loss)
+
 
 @tf.function
 def training_step_curiosty(
@@ -306,24 +275,23 @@ def training_step_curiosty(
     gradients = tape.gradient(loss, curiosity.trainable_variables)
     optimizer.apply_gradients(zip(gradients, curiosity.trainable_variables))
 
-    tf.summary.scalar('curiosity_loss', loss, step=step) # type: ignore
+    return tf.reduce_mean(loss)
 
 
-
-#@tf.function
+@tf.function
 def training_step_autoencoder(
     batch,
     autoencoder,
     optimizer: tf.keras.optimizers.Optimizer,
     step: int
 ):
-    observation_buffer = batch
-    observation_buffer = tf.cast(observation_buffer, tf.float32) / 255.0
+    observation_buffer = tf.cast(batch, tf.float32)
+    observation_buffer_cast = tf.cast(batch, tf.float32) / 255.0
 
     with tf.GradientTape() as tape:
-        loss = tf.reduce_mean(tf.square(observation_buffer - autoencoder(observation_buffer)))
+        loss = tf.reduce_mean(tf.square(observation_buffer_cast - autoencoder(observation_buffer)))
 
     gradients = tape.gradient(loss, autoencoder.trainable_variables)
     optimizer.apply_gradients(zip(gradients, autoencoder.trainable_variables))
 
-    tf.summary.scalar('autoencoder_loss', loss, step=step) # type: ignore
+    return tf.reduce_mean(loss)

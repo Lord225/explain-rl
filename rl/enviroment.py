@@ -31,15 +31,15 @@ class ProcGenWrapper(gym3.Wrapper):
 
         if self.return_segments:
             for _ in range(self.frame_stack_count):
-                self.frame_stack.append(np.zeros((self.num, 64, 64, 4), dtype=np.int8))
+                self.frame_stack.append(np.zeros((self.num, 64, 64, 4), dtype=np.uint8))
         else:
             for _ in range(self.frame_stack_count):
-                self.frame_stack.append(np.zeros((self.num, 64, 64, 3), dtype=np.int8))
+                self.frame_stack.append(np.zeros((self.num, 64, 64, 3), dtype=np.uint8))
 
         states = self.env_normal.callmethod("get_state")
         self.env_mono.callmethod("set_state", states)
 
-        return np.concatenate(self.frame_stack, axis=3, dtype=np.int8)
+        return np.concatenate(self.frame_stack, axis=3, dtype=np.uint8)
     
     def observe(self):
         rew_normal, obs_normal, first_normal = self.env_normal.observe()
@@ -49,7 +49,7 @@ class ProcGenWrapper(gym3.Wrapper):
         if self.return_segments:
             mono = obs_mono['rgb']
             mono = np.argmax((mono.reshape(-1, 1, 3) == ProcGenWrapper.UNIQUE_COLORS).all(axis=2), axis=1).reshape(mono.shape[0], 64, 64, 1)
-            obs = np.concatenate([obs_normal['rgb'], mono], axis=3, dtype=np.int8)
+            obs = np.concatenate([obs_normal['rgb'], mono], axis=3, dtype=np.uint8)
         else:
             obs = obs_normal['rgb']
         
@@ -66,7 +66,7 @@ class ProcGenWrapper(gym3.Wrapper):
 
         self.frame_stack.append(raw_obs)
 
-        return np.concatenate(self.frame_stack, axis=3, dtype=np.int8), rew, first
+        return np.concatenate(self.frame_stack, axis=3, dtype=np.uint8), rew, first
     
     
 ObservationTransformer = Callable[[Any], np.ndarray]
@@ -74,13 +74,13 @@ ObservationTransformer = Callable[[Any], np.ndarray]
 def make_tensorflow_env_step(env: ProcGenWrapper, observation_transformer: ObservationTransformer)-> Callable[[tf.Tensor], Tuple[tf.Tensor, tf.Tensor, tf.Tensor]]:
     def step(action):
         state, reward, done = env.step(np.array([action]))
-        return (np.array(state, np.int8), np.array(reward, np.float32), np.array(done, np.int32))
+        return (np.array(state, np.uint8), np.array(reward, np.float32), np.array(done, np.int32))
 
     @tf.function(
         input_signature=[tf.TensorSpec(shape=(), dtype=tf.int32)] # type: ignore
     )
     def tf_env_step(action):
-        return tf.numpy_function(step, [action], (tf.int8, tf.float32, tf.int32))
+        return tf.numpy_function(step, [action], (tf.uint8, tf.float32, tf.int32))
     return tf_env_step # type: ignore
     
 
@@ -91,7 +91,8 @@ def make_tensorflow_env_reset(env: ProcGenWrapper, observation_transformer: Obse
     
     @tf.function
     def tf_env_reset():
-        return tf.numpy_function(reset, [], tf.int8)  # type: ignore
+        return tf.numpy_function(reset, [], tf.uint8)  # type: ignore
+    
     return tf_env_reset # type: ignore
 
 if __name__ == "__main__":

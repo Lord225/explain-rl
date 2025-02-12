@@ -14,12 +14,12 @@ def get_curius_ppo_runner(tf_env_step: Callable[[tf.Tensor], Tuple[tf.Tensor, tf
             env_actions: int,
             curius_coef: float,
             ):
-        states = tf.TensorArray(dtype=tf.int8, size=0, dynamic_size=True)
+        states = tf.TensorArray(dtype=tf.uint8, size=0, dynamic_size=True)
         actions = tf.TensorArray(dtype=tf.int32, size=0, dynamic_size=True)
         rewards = tf.TensorArray(dtype=tf.float32, size=0, dynamic_size=True)
         values = tf.TensorArray(dtype=tf.float32, size=0, dynamic_size=True)
         log_probs = tf.TensorArray(dtype=tf.float32, size=0, dynamic_size=True)
-        next_states = tf.TensorArray(dtype=tf.int8, size=0, dynamic_size=True)
+        next_states = tf.TensorArray(dtype=tf.uint8, size=0, dynamic_size=True)
 
         curiosities = tf.TensorArray(dtype=tf.float32, size=0, dynamic_size=True)
 
@@ -95,12 +95,12 @@ def get_curius_ppo_runner_2(tf_env_step: Callable[[tf.Tensor], Tuple[tf.Tensor, 
             env_actions: int,
             curius_coef: float,
             ):
-        states = tf.TensorArray(dtype=tf.int8, size=0, dynamic_size=True)
+        states = tf.TensorArray(dtype=tf.uint8, size=0, dynamic_size=True)
         actions = tf.TensorArray(dtype=tf.int32, size=0, dynamic_size=True)
         rewards = tf.TensorArray(dtype=tf.float32, size=0, dynamic_size=True)
         values = tf.TensorArray(dtype=tf.float32, size=0, dynamic_size=True)
         log_probs = tf.TensorArray(dtype=tf.float32, size=0, dynamic_size=True)
-        next_states = tf.TensorArray(dtype=tf.int8, size=0, dynamic_size=True)
+        next_states = tf.TensorArray(dtype=tf.uint8, size=0, dynamic_size=True)
 
         curiosities = tf.TensorArray(dtype=tf.float32, size=0, dynamic_size=True)
 
