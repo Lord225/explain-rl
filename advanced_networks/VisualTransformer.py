@@ -194,6 +194,7 @@ class ViT(tf.keras.Model):
         dropout=0.1,
         activation="linear",
         representation_size: Optional[int] = None,
+        preprocess=None,
     ):
         super(ViT, self).__init__(name=name)
 
@@ -207,6 +208,11 @@ class ViT(tf.keras.Model):
         self.dropout = dropout
         self.activation = activation
         self.representation_size = representation_size
+
+        if preprocess is not None:
+            self.preprocess = preprocess
+        else:
+            self.preprocess = None
 
         self.embedding = tf.keras.layers.Conv2D(
             filters=self.hidden_size,
@@ -245,7 +251,12 @@ class ViT(tf.keras.Model):
         
 
     def call(self, inputs):
-        x = self.embedding(inputs)
+        if self.preprocess is not None:
+            x = self.preprocess(inputs)
+        else:
+            x = inputs
+        
+        x = self.embedding(x)
         x = tf.keras.layers.Reshape((x.shape[1] * x.shape[2], x.shape[3]))(x)
         x = self.class_token(x)
         x = self.pos_embed(x)
