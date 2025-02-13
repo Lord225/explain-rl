@@ -81,6 +81,36 @@ class PPOReplayMemory:
         return_buffer = tf.tensor_scatter_nd_update(return_buffer, indices[:, None], returns)
 
         return states_buffer, advantages_buffer, actions_buffer, rewards_buffer, return_buffer, logprobability_buffer, next_states_buffer, count
+    
+    #@tf.function
+    def add_multiple_tf(self, states, actions, rewards, values, logprobabilities, next_states,
+                        states_buffer, advantages_buffer, actions_buffer, rewards_buffer, return_buffer, logprobability_buffer, next_states_buffer, dones,
+                        gamma, lam, max_size, count):
+        # in dones buffer we have 1 for every new trajectory start. We need to add each of them as a separate trajectory using add_tf function so we need to split them here and then add each of them separately.
+        ones_idx = tf.where(dones == 1)
+        ones_idx = tf.concat([ones_idx, [[len(dones)]]], axis=0)
+
+        for i in range(len(ones_idx) - 1):
+            start = ones_idx[i][0]
+            end = ones_idx[i+1][0]
+            states_buffer, advantages_buffer, actions_buffer, rewards_buffer, return_buffer, logprobability_buffer, next_states_buffer, count = self.add_tf(
+                states[start:end], 
+                actions[start:end], 
+                rewards[start:end], 
+                values[start:end], 
+                logprobabilities[start:end],
+                next_states[start:end],
+                states_buffer, 
+                advantages_buffer, 
+                actions_buffer, 
+                rewards_buffer, 
+                return_buffer, 
+                logprobability_buffer,
+                next_states_buffer,
+                gamma, 
+                lam, 
+                max_size, 
+                count)
         
 
     def add(self, observations, actions, rewards, values, logprobabilities, next_states):

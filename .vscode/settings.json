@@ -3,5 +3,6 @@
         "~/.local/virtual-site-packages",
         "~/miniconda3/lib",
         "./procgen-custom/procgen"
-    ]
+    ],
+    "cmake.ignoreCMakeListsMissing": true
 }
