@@ -26,6 +26,15 @@ class PPOReplayHistoryCuriosityType(NamedTuple):
     logprobability: tf.Tensor
     next_states: tf.Tensor
 
+class ParPPOReplayHistoryCuriosityType(NamedTuple):
+    states: tf.Tensor
+    actions: tf.Tensor
+    advantages: tf.Tensor
+    returns: tf.Tensor
+    logprobability: tf.Tensor
+    next_states: tf.Tensor
+    dones: tf.Tensor
+
 class HistorySampleType(NamedTuple):
     states: tf.Tensor
     actions: tf.Tensor

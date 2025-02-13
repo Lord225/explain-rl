@@ -1,3 +1,4 @@
+from turtle import done
 import tensorflow as tf
 from tensorboard.plugins.hparams import api as hp
 from .common import HistorySampleType, HistorySampleCriticType, HistorySampleCuriosityType
@@ -82,36 +83,146 @@ class PPOReplayMemory:
 
         return states_buffer, advantages_buffer, actions_buffer, rewards_buffer, return_buffer, logprobability_buffer, next_states_buffer, count
     
-    #@tf.function
-    def add_multiple_tf(self, states, actions, rewards, values, logprobabilities, next_states,
-                        states_buffer, advantages_buffer, actions_buffer, rewards_buffer, return_buffer, logprobability_buffer, next_states_buffer, dones,
+    @tf.function(reduce_retracing=True)
+    def add_multiple_tf(self, states, actions, rewards, values, logprobabilities, next_states, dones,
+                        states_buffer, advantages_buffer, actions_buffer, rewards_buffer, return_buffer, logprobability_buffer, next_states_buffer,
                         gamma, lam, max_size, count):
-        # in dones buffer we have 1 for every new trajectory start. We need to add each of them as a separate trajectory using add_tf function so we need to split them here and then add each of them separately.
-        ones_idx = tf.where(dones == 1)
-        ones_idx = tf.concat([ones_idx, [[len(dones)]]], axis=0)
 
-        for i in range(len(ones_idx) - 1):
-            start = ones_idx[i][0]
-            end = ones_idx[i+1][0]
-            states_buffer, advantages_buffer, actions_buffer, rewards_buffer, return_buffer, logprobability_buffer, next_states_buffer, count = self.add_tf(
-                states[start:end], 
-                actions[start:end], 
-                rewards[start:end], 
-                values[start:end], 
-                logprobabilities[start:end],
-                next_states[start:end],
-                states_buffer, 
-                advantages_buffer, 
-                actions_buffer, 
-                rewards_buffer, 
-                return_buffer, 
-                logprobability_buffer,
-                next_states_buffer,
-                gamma, 
-                lam, 
-                max_size, 
-                count)
-        
+        num_steps = tf.shape(states)[0]
+        num_envs = tf.shape(states)[1]
+
+        # Loop over each environment
+        env_idx = tf.constant(0, dtype=tf.int32)
+        env_cond = lambda env_idx, states_buffer, advantages_buffer, actions_buffer, rewards_buffer, return_buffer, logprobability_buffer, next_states_buffer, count: env_idx < num_envs
+
+        def process_env(env_idx, states_buffer, advantages_buffer, actions_buffer, rewards_buffer, return_buffer, logprobability_buffer, next_states_buffer, count):
+            # Extract data for the current environment
+            states_j = states[:, env_idx]
+            actions_j = actions[:, env_idx]
+            rewards_j = rewards[:, env_idx]
+            values_j = values[:, env_idx]
+            logprob_j = logprobabilities[:, env_idx]
+            next_states_j = next_states[:, env_idx]
+            dones_j = dones[:, env_idx]
+
+            # Find indices where dones are True for the current environment
+            split_indices = tf.squeeze(tf.where(tf.equal(dones_j, 1)), axis=1)
+            split_indices = tf.cast(split_indices, tf.int32)
+
+            # Append the end of the steps to split_indices to capture any remaining data
+            split_indices = tf.concat([split_indices, [num_steps]], axis=0)
+
+            # Process each trajectory in the current environment
+            split_idx = tf.constant(0, dtype=tf.int32)
+            prev_split = tf.constant(-1, dtype=tf.int32)
+            num_splits = tf.shape(split_indices)[0]
+
+            def process_split(split_idx, prev_split, states_buffer, advantages_buffer, actions_buffer, rewards_buffer, return_buffer, logprobability_buffer, next_states_buffer, count):
+                current_split = split_indices[split_idx]
+                start = prev_split + 1
+                end = current_split
+
+                trajectory_length = end - start
+
+                def add_trajectory():
+                    # Slice the data for this trajectory
+                    states_traj = states_j[start:end]
+                    actions_traj = actions_j[start:end]
+                    rewards_traj = rewards_j[start:end]
+                    values_traj = values_j[start:end]
+                    logprob_traj = logprob_j[start:end]
+                    next_states_traj = next_states_j[start:end]
+
+                    # Call add_tf to add this trajectory to the buffer
+                    (updated_states, updated_advantages, updated_actions, updated_rewards, updated_return, updated_logprob, updated_next_states, new_count) = self.add_tf(
+                        states_traj,
+                        actions_traj,
+                        rewards_traj,
+                        values_traj,
+                        logprob_traj,
+                        next_states_traj,
+                        states_buffer,
+                        advantages_buffer,
+                        actions_buffer,
+                        rewards_buffer,
+                        return_buffer,
+                        logprobability_buffer,
+                        next_states_buffer if self.next_states_buffer is not None else None,
+                        gamma,
+                        lam,
+                        max_size,
+                        count
+                    ) # type: ignore
+
+                    return (updated_states, updated_advantages, updated_actions, updated_rewards, updated_return, updated_logprob, updated_next_states, new_count)
+
+                # Conditionally add the trajectory if it has at least one step
+                (states_buffer, advantages_buffer, actions_buffer, rewards_buffer, return_buffer, logprobability_buffer, next_states_buffer, count) = tf.cond(
+                    trajectory_length > 0,
+                    lambda: add_trajectory(),
+                    lambda: (states_buffer, advantages_buffer, actions_buffer, rewards_buffer, return_buffer, logprobability_buffer, next_states_buffer, count)
+                )
+
+                # Update previous split and split index
+                return (split_idx + 1, current_split, states_buffer, advantages_buffer, actions_buffer, rewards_buffer, return_buffer, logprobability_buffer, next_states_buffer, count)
+
+            # Process all splits for the current environment
+            _, _, states_buffer, advantages_buffer, actions_buffer, rewards_buffer, return_buffer, logprobability_buffer, next_states_buffer, count = tf.while_loop(
+                cond=lambda split_idx, *_: split_idx < num_splits,
+                body=process_split,
+                loop_vars=(split_idx, prev_split, states_buffer, advantages_buffer, actions_buffer, rewards_buffer, return_buffer, logprobability_buffer, next_states_buffer, count),
+                maximum_iterations=num_splits
+            )
+
+            # Move to the next environment
+            return env_idx + 1, states_buffer, advantages_buffer, actions_buffer, rewards_buffer, return_buffer, logprobability_buffer, next_states_buffer, count
+
+        # Process all environments
+        _, states_buffer, advantages_buffer, actions_buffer, rewards_buffer, return_buffer, logprobability_buffer, next_states_buffer, count = tf.while_loop(
+            env_cond,
+            process_env,
+            loop_vars=(env_idx, states_buffer, advantages_buffer, actions_buffer, rewards_buffer, return_buffer, logprobability_buffer, next_states_buffer, count),
+            parallel_iterations=1  
+        )
+
+        return states_buffer, advantages_buffer, actions_buffer, rewards_buffer, return_buffer, logprobability_buffer, next_states_buffer, count
+    
+    def add_multiple(self, states, actions, rewards, values, logprobabilities, next_states, dones):
+        count = tf.constant(self.count, dtype=tf.int32)
+        max_size = tf.constant(self.max_size, dtype=tf.int32)
+        gamma = tf.constant(self.gamma, dtype=tf.float32)
+        lam = tf.constant(self.lam, dtype=tf.float32)
+
+        states_buffer, advantages_buffer, actions_buffer, rewards_buffer, return_buffer, logprobability_buffer, next_states_buffer, new_count = self.add_multiple_tf(
+            states,
+            actions,
+            rewards,
+            values,
+            logprobabilities,
+            next_states,
+            dones,
+            self.states_buffer,
+            self.advantages_buffer,
+            self.actions_buffer,
+            self.rewards_buffer,
+            self.return_buffer,
+            self.logprobability_buffer,
+            self.next_states_buffer,
+            gamma,
+            lam,
+            max_size,
+            count
+        ) # type: ignore
+
+        self.states_buffer = states_buffer
+        self.advantages_buffer = advantages_buffer
+        self.actions_buffer = actions_buffer
+        self.rewards_buffer = rewards_buffer
+        self.return_buffer = return_buffer
+        self.logprobability_buffer = logprobability_buffer
+        self.next_states_buffer = next_states_buffer
+
+        self.count = int(new_count)
 
     def add(self, observations, actions, rewards, values, logprobabilities, next_states):
         count = tf.constant(self.count, dtype=tf.int32)

@@ -1,6 +1,6 @@
 from typing import Callable, Tuple
 import tensorflow as tf
-from .common import PPOReplayHistoryCuriosityType
+from .common import PPOReplayHistoryCuriosityType, ParPPOReplayHistoryCuriosityType
 from .ppo import logprobabilities
 
 def get_curius_ppo_runner(tf_env_step: Callable[[tf.Tensor], Tuple[tf.Tensor, tf.Tensor, tf.Tensor]]):
@@ -181,6 +181,7 @@ def get_curius_ppo_runner_paraller(tf_env_step: Callable[[tf.Tensor], Tuple[tf.T
         values = tf.TensorArray(dtype=tf.float32, size=0, dynamic_size=True)
         log_probs = tf.TensorArray(dtype=tf.float32, size=0, dynamic_size=True)
         next_states = tf.TensorArray(dtype=tf.uint8, size=0, dynamic_size=True)
+        dones = tf.TensorArray(dtype=tf.int32, size=0, dynamic_size=True)
 
         curiosities = tf.TensorArray(dtype=tf.float32, size=0, dynamic_size=True)
 
@@ -202,15 +203,12 @@ def get_curius_ppo_runner_paraller(tf_env_step: Callable[[tf.Tensor], Tuple[tf.T
             next_state.set_shape(initial_state_shape)
             
             action_one_hot = tf.one_hot(action, env_actions)
-            action_input_processed = tf.expand_dims(action_one_hot, axis=0)
             
             # calculate curiosity
             encoded_state = encoder(state)
             encoded_next_state = encoder(next_state)
-            encoded_predicted_state = curiosity([encoded_state, action_input_processed])
-            encoded_predicted_state = tf.squeeze(encoded_predicted_state, axis=0)
-
-            curiosity_reward = tf.reduce_sum(tf.square(encoded_next_state - encoded_predicted_state))
+            encoded_predicted_state = curiosity([encoded_state, action_one_hot])
+            curiosity_reward = tf.reduce_sum(tf.square(encoded_next_state - encoded_predicted_state), axis=1)
             
             reward = reward + curius_coef * curiosity_reward # type: ignore
             
@@ -224,6 +222,7 @@ def get_curius_ppo_runner_paraller(tf_env_step: Callable[[tf.Tensor], Tuple[tf.T
             rewards = rewards.write(t, tf.squeeze(reward))
             values = values.write(t, tf.squeeze(value_t))
             log_probs = log_probs.write(t, tf.squeeze(log_prob))
+            dones = dones.write(t, tf.squeeze(done))
 
             state = next_state
 
@@ -234,7 +233,8 @@ def get_curius_ppo_runner_paraller(tf_env_step: Callable[[tf.Tensor], Tuple[tf.T
         log_probs = log_probs.stack()
         next_states = next_states.stack()
         curiosities = curiosities.stack()
+        dones = dones.stack()
 
-        return PPOReplayHistoryCuriosityType(states, actions, rewards, values, log_probs, next_states), tf.reduce_sum(rewards), tf.reduce_mean(curiosities),  tf.math.reduce_std(curiosities)
+        return ParPPOReplayHistoryCuriosityType(states, actions, rewards, values, log_probs, next_states, dones), tf.reduce_sum(rewards, axis=0), tf.reduce_mean(curiosities, axis=0),  tf.math.reduce_std(curiosities, axis=0)
                 
     return run_episode

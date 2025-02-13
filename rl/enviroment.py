@@ -48,7 +48,7 @@ class ProcGenWrapper(gym3.Wrapper):
 
         if self.return_segments:
             mono = obs_mono['rgb']
-            mono = np.argmax((mono.reshape(-1, 1, 3) == ProcGenWrapper.UNIQUE_COLORS).all(axis=2), axis=1).reshape(mono.shape[0], 64, 64, 1)
+            mono = np.argmax((mono.reshape(-1, 1, 3) == ProcGenWrapper.UNIQUE_COLORS).all(axis=2), axis=1).reshape(mono.shape[0], 64, 64, 1).astype(np.uint8)
             obs = np.concatenate([obs_normal['rgb'], mono], axis=3, dtype=np.uint8)
         else:
             obs = obs_normal['rgb']
@@ -82,7 +82,19 @@ def make_tensorflow_env_step(env: ProcGenWrapper, observation_transformer: Obser
     def tf_env_step(action):
         return tf.numpy_function(step, [action], (tf.uint8, tf.float32, tf.int32))
     return tf_env_step # type: ignore
-    
+
+def make_tensorflow_env_step_par(env: ProcGenWrapper, observation_transformer: ObservationTransformer)-> Callable[[tf.Tensor], Tuple[tf.Tensor, tf.Tensor, tf.Tensor]]:
+    def step(action):
+        state, reward, done = env.step(action)
+        return (np.array(state, np.uint8), np.array(reward, np.float32), np.array(done, np.int32))
+
+    @tf.function(
+        input_signature=[tf.TensorSpec(shape=(None,), dtype=tf.int32)]  # type: ignore
+    )
+    def tf_env_step(action):
+        return tf.numpy_function(step, [action], (tf.uint8, tf.float32, tf.int32))
+    return tf_env_step # type: ignore
+       
 
 def make_tensorflow_env_reset(env: ProcGenWrapper, observation_transformer: ObservationTransformer) -> Callable[[], tf.Tensor]:
     def reset():
@@ -97,11 +109,13 @@ def make_tensorflow_env_reset(env: ProcGenWrapper, observation_transformer: Obse
 
 if __name__ == "__main__":
     import random
-    env = ProcGenWrapper("caveflyer", num=2, return_segments=True, frame_stack_count=2)
+    env = ProcGenWrapper("caveflyer", num=10, return_segments=True, frame_stack_count=2)
     env.reset()
-    # action = random.randint(0, 15)
-    # rew, obs, first = env.step(np.array([action]*10))
-    # print(obs.shape)
+    action = random.randint(0, 15)
+    obs, rew, first = env.step(np.array([action]*10))
+    print(first)
+    print(obs.shape)
+    print(first.shape)
     # print(rew)
     # print(first)
     # # plot the first frame of the first batch on two subplots
@@ -119,25 +133,25 @@ if __name__ == "__main__":
     # plt.imshow(obs[0, :, :, 9:12]/255.0)
     # plt.title('Monochrome 2')
     # plt.show()
-    unque = set()
-    for i in range(1024):
-        actions = np.random.randint(0, 15, size=(2,))
+    # unque = set()
+    # for i in range(1024):
+    #     actions = np.random.randint(0, 15, size=(2,))
     
-        rew, obs, first = env.step(actions)
-        print(rew)
-        print(obs.shape)
-        print(first)
-        # plot the first frame of the first batch on two subplots
-        import matplotlib.pyplot as plt
-        plt.subplot(2, 2, 1)
-        plt.imshow(obs[0, :, :, 4:7]/255.0)
-        plt.title('Normal 1')
-        plt.subplot(2, 2, 2)
-        plt.imshow(obs[0, :, :, 7])
-        plt.title('Monochrome 1')
-        plt.show()
+    #     rew, obs, first = env.step(actions)
+    #     print(rew)
+    #     print(obs.shape)
+    #     print(first)
+    #     # plot the first frame of the first batch on two subplots
+    #     import matplotlib.pyplot as plt
+    #     plt.subplot(2, 2, 1)
+    #     plt.imshow(obs[0, :, :, 4:7]/255.0)
+    #     plt.title('Normal 1')
+    #     plt.subplot(2, 2, 2)
+    #     plt.imshow(obs[0, :, :, 7])
+    #     plt.title('Monochrome 1')
+    #     plt.show()
 
 
-    print(f"Unique colors in mono layer {unque}")
+    # print(f"Unique colors in mono layer {unque}")
             
 
