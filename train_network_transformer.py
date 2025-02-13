@@ -1,4 +1,4 @@
-# Vanilla PPO with curiosity
+# Transformer as actor and critic
 
 from collections import deque
 import tensorflow as tf
@@ -49,14 +49,14 @@ params.clip_ratio = 0.20
 params.lam = 0.98
 
 # params.curius_coef = 0.013
-params.curius_coef = 0.000001
+params.curius_coef = 0.0000003
 
-params.batch_size = 2048
-params.batch_size_curius = 512
+params.batch_size = 256
+params.batch_size_curius = 256
 
 params.train_interval = 20    
-params.iters = 200
-params.iters_courious = 300            
+params.iters = 400
+params.iters_courious = 400            
 
 params.save_freq = 500
 if args.resume is not None:
@@ -78,15 +78,15 @@ def get_actor():
     model = VisualTransformer.ViT(
         image_size=(64, 64, 9),
         patch_size=4,
-        num_layers=4,
+        num_layers=3,
         hidden_size=64,
-        num_heads=8,
+        num_heads=2,
         name='actor',
         mlp_dim=64,
         classes=15,
-        dropout=0.15,
+        dropout=0.1,
         activation='linear',
-        representation_size=64,
+        representation_size=32,
         preprocess=tf.keras.Sequential(
             [
                 tf.keras.layers.InputLayer(input_shape=(64, 64, 9), dtype=tf.float32),
@@ -110,15 +110,15 @@ def get_critic():
     model = VisualTransformer.ViT(
         image_size=(64, 64, 9),
         patch_size=4,
-        num_layers=4,
+        num_layers=3,
         hidden_size=64,
-        num_heads=8,
+        num_heads=2,
         name='critic',
         mlp_dim=64,
         classes=1,
-        dropout=0.15,
+        dropout=0.1,
         activation='linear',
-        representation_size=64,
+        representation_size=32,
         preprocess=tf.keras.Sequential(
             [
                 tf.keras.layers.InputLayer(input_shape=(64, 64, 9), dtype=tf.float32),
@@ -307,7 +307,7 @@ class TimeLogger:
 def run():
     running_avg = deque(maxlen=200)
 
-    memory = ppo.PPOReplayMemory(50_000, params.observation_space, gamma=params.discount_rate, lam=params.lam, gather_next_states=True)
+    memory = ppo.PPOReplayMemory(10_000, params.observation_space, gamma=params.discount_rate, lam=params.lam, gather_next_states=True)
 
     env_step = enviroments.make_tensorflow_env_step(env, lambda x: x) # type: ignore
     env_reset = enviroments.make_tensorflow_env_reset(env, lambda x: x) # type: ignore
