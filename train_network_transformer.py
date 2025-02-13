@@ -29,7 +29,7 @@ params.env_name = env.env
 params.version = "v2"
 params.DRY_RUN = False
 
-params.actor_lr  = 1e-6
+params.actor_lr  = 1e-5
 params.critic_lr = 3e-5
 
 params.action_space = 15

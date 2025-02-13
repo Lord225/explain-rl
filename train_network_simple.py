@@ -27,7 +27,7 @@ params.env_name = env.env
 params.version = "v1"
 params.DRY_RUN = False
 
-params.actor_lr  = 1e-6
+params.actor_lr  = 1e-5
 params.critic_lr = 3e-5
 
 params.action_space = 15
@@ -36,7 +36,7 @@ params.observation_space = (64, 64, 9)
 params.encoding_size = 128
 
 params.episodes = 20000
-params.max_steps_per_episode = 150
+params.max_steps_per_episode = 200
 
 params.discount_rate = 0.99
 
@@ -47,14 +47,14 @@ params.clip_ratio = 0.20
 params.lam = 0.98
 
 # params.curius_coef = 0.013
-params.curius_coef = 0.000001
+params.curius_coef = 0.0000003
 
-params.batch_size = 2048
+params.batch_size = 4096
 params.batch_size_curius = 512
 
-params.train_interval = 20    
+params.train_interval = 10
 params.iters = 200
-params.iters_courious = 300            
+params.iters_courious = 300
 
 params.save_freq = 500
 if args.resume is not None:
@@ -336,7 +336,7 @@ class TimeLogger:
 def run():
     running_avg = deque(maxlen=200)
 
-    memory = ppo.PPOReplayMemory(50_000, params.observation_space, gamma=params.discount_rate, lam=params.lam, gather_next_states=True)
+    memory = ppo.PPOReplayMemory(20_000, params.observation_space, gamma=params.discount_rate, lam=params.lam, gather_next_states=True)
 
     env_step = enviroments.make_tensorflow_env_step(env, lambda x: x) # type: ignore
     env_reset = enviroments.make_tensorflow_env_reset(env, lambda x: x) # type: ignore
