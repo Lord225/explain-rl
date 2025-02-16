@@ -1,4 +1,4 @@
-# Vanilla PPO with curiosity
+# Transformer as actor and critic
 
 from collections import deque
 import tensorflow as tf
@@ -6,9 +6,11 @@ import tensorboard
 import os
 import argparse
 import tqdm
+from advanced_networks import VisualTransformer
+from advanced_networks.VAE import VariationalAutoencoder
 from rl.common import splash_screen
 import rl.config as config
-from rl.episode_runner import get_curius_ppo_runner_paraller
+from rl.episode_runner import get_curius_ppo_runner_2
 import rl.ppo as ppo
 import rl.enviroment as enviroments
 import os
@@ -19,24 +21,24 @@ parser.add_argument("--resume", type=str, default=None, help="resume from a mode
 
 args = parser.parse_args()
 
-env = enviroments.ProcGenWrapper("caveflyer", 10, False, 3)
+env = enviroments.ProcGenWrapper("starpilot", 1, False, 3)
 
 params = argparse.Namespace()
 
 params.env_name = env.env
-params.version = "v1.1"
+params.version = "v2"
 params.DRY_RUN = False
 
-params.actor_lr  = 1e-6
+params.actor_lr  = 1e-5
 params.critic_lr = 3e-5
 
 params.action_space = 15
 params.observation_space_raw =  (64, 64, 9)
 params.observation_space = (64, 64, 9)
-params.encoding_size = 128
+params.encoding_size = 256
 
 params.episodes = 20000
-params.max_steps_per_episode = 200
+params.max_steps_per_episode = 250
 
 params.discount_rate = 0.99
 
@@ -47,14 +49,14 @@ params.clip_ratio = 0.20
 params.lam = 0.98
 
 # params.curius_coef = 0.013
-params.curius_coef = 0.0000003
+params.curius_coef = 0.0000007
 
-params.batch_size = 4096
-params.batch_size_curius = 512
+params.batch_size = 512
+params.batch_size_curius = 256
 
-params.train_interval = 2
-params.iters = 50
-params.iters_courious = 50
+params.train_interval = 10    
+params.iters = 400
+params.iters_courious = 400            
 
 params.save_freq = 500
 if args.resume is not None:
@@ -73,26 +75,32 @@ def get_actor():
         print("loaded model from", args.resume)
         return model
 
-    observation_input = tf.keras.Input(shape=params.observation_space, dtype=tf.uint8)
-    x = tf.cast(observation_input, tf.float32)
-    x = x / 255.0 # type: ignore
-    x = tf.keras.layers.Conv2D(8, 3, strides=2, activation=tf.nn.elu)(x)
-    x = tf.keras.layers.Conv2D(16, 3, strides=2, activation=tf.nn.elu)(x)
-    x = tf.keras.layers.Conv2D(32, 3, strides=2, activation=tf.nn.elu)(x)
-    x = tf.keras.layers.Conv2D(32, 3, strides=2, activation=tf.nn.elu)(x)
-    x = tf.keras.layers.Conv2D(16, 3, strides=2, activation=tf.nn.elu)(x)
-    x = tf.keras.layers.Flatten()(x)
-    x = tf.keras.layers.Dense(32, activation=tf.nn.elu)(x)
-    x = tf.keras.layers.Dense(32, activation=tf.nn.elu)(x)
-    x = tf.keras.layers.Dense(32, activation=tf.nn.elu)(x)
+    model = VisualTransformer.ViT(
+        image_size=(64, 64, 9),
+        patch_size=4,
+        num_layers=4,
+        hidden_size=64,
+        num_heads=4,
+        name='actor',
+        mlp_dim=64,
+        classes=15,
+        dropout=0.1,
+        activation='linear',
+        representation_size=32,
+        preprocess=tf.keras.Sequential(
+            [
+                tf.keras.layers.InputLayer(input_shape=(64, 64, 9), dtype=tf.float32),
+                tf.keras.layers.Lambda(lambda x: tf.cast(x, tf.float32) / 255.0),
+            ]
+        )
+    )
 
-    logits = tf.keras.layers.Dense(params.action_space)(x)
-
-    model = tf.keras.Model(inputs=observation_input, outputs=logits, name='actor')
+    model.build((None, 64, 64, 9))
 
     model.summary()
 
     return model
+
 
 def get_critic():
     if args.resume is not None:
@@ -129,75 +137,34 @@ def get_curiosity_autoencoder():
         encoder = tf.keras.Model(inputs=inputs, outputs=latent_output[:, :latent_dim], name='encoder')
         print("loaded model from", args.resume)
         return encoder, autoencoder
-    
-    class CVAE(tf.keras.Model):
-        def __init__(self, latent_dim):
-            super(CVAE, self).__init__()
-            self.latent_dim = latent_dim
-            self.encoder = tf.keras.Sequential(
-                [
-                    tf.keras.layers.InputLayer(input_shape=(64, 64, 9), dtype=tf.float32),
-                    tf.keras.layers.Lambda(lambda x: tf.cast(x, tf.float32) / 255.0),
-                    tf.keras.layers.Conv2D(filters=8, kernel_size=3, strides=(2, 2), activation='relu'),
-                    tf.keras.layers.Conv2D(filters=16, kernel_size=3, strides=(2, 2), activation='relu'),
-                    tf.keras.layers.Conv2D(filters=32, kernel_size=3, strides=(2, 2), activation='relu'),
-                    tf.keras.layers.Conv2D(filters=64, kernel_size=3, strides=(2, 2), activation='relu'),
-                    tf.keras.layers.Conv2D(filters=128, kernel_size=3, strides=(2, 2), activation='relu'),
-                    tf.keras.layers.Flatten(),
-                    tf.keras.layers.Dense(128, activation='relu'),
-                    tf.keras.layers.Dense(latent_dim * 2, name='latent_space'),
-                ]
-            )
-
-            self.decoder = tf.keras.Sequential(
-                [
-                    tf.keras.layers.InputLayer(input_shape=(latent_dim,)),
-                    tf.keras.layers.Dense(units=2*2*32, activation=tf.nn.relu),
-                    tf.keras.layers.Reshape(target_shape=(2, 2, 32)),
-                    tf.keras.layers.Conv2DTranspose(filters=32, kernel_size=3, strides=2, padding='same', activation='relu'),
-                    tf.keras.layers.Conv2DTranspose(filters=32, kernel_size=3, strides=2, padding='same', activation='relu'),
-                    tf.keras.layers.Conv2DTranspose(filters=32, kernel_size=3, strides=2, padding='same', activation='relu'),
-                    tf.keras.layers.Conv2DTranspose(filters=16, kernel_size=3, strides=2, padding='same', activation='relu'),
-                    tf.keras.layers.Conv2DTranspose(filters=16, kernel_size=3, strides=2, padding='same', activation='relu'),
-                    tf.keras.layers.Conv2DTranspose(filters=9, kernel_size=2, strides=1, padding='same', activation='sigmoid'),
-                ]
-            )
-
-        @tf.function
-        def sample(self, eps=None):
-            if eps is None:
-                eps = tf.random.normal(shape=(100, self.latent_dim))
-            return self.decode(eps, apply_sigmoid=True)
-
-        def encode(self, x):
-            mean, logvar = tf.split(self.encoder(x), num_or_size_splits=2, axis=1)
-            return mean, logvar
-
-        def reparameterize(self, mean, logvar):
-            batch = tf.shape(mean)[0]
-            dim = tf.shape(mean)[1]
-            eps = tf.random.normal(shape=(batch, dim))
-            return eps * tf.exp(logvar * .5) + mean
-
-        def decode(self, z, apply_sigmoid=False):
-            logits = self.decoder(z)
-            if apply_sigmoid:
-                probs = tf.sigmoid(logits)
-                return probs
-            return logits
-
-        def call(self, inputs):
-            mean, logvar = self.encode(inputs)
-            z = self.reparameterize(mean, logvar)
-            return self.decode(z)
 
 
-    autoencoder = CVAE(latent_dim)
+    autoencoder = VariationalAutoencoder(latent_dim, 
+        encoder=[
+            tf.keras.layers.InputLayer(input_shape=(64, 64, 9), dtype=tf.float32),
+            tf.keras.layers.Lambda(lambda x: tf.cast(x, tf.float32) / 255.0),
+            tf.keras.layers.Conv2D(filters=8, kernel_size=3, strides=(2, 2), activation='relu', padding='same'),    
+            tf.keras.layers.Conv2D(filters=16, kernel_size=3, strides=(2, 2), activation='relu',padding='same'),
+            tf.keras.layers.Conv2D(filters=32, kernel_size=3, strides=(2, 2), activation='relu', padding='same'),
+            tf.keras.layers.Conv2D(filters=64, kernel_size=3, strides=(2, 2), activation='relu', padding='same'),
+            tf.keras.layers.Conv2D(filters=64, kernel_size=3, strides=(1, 1), activation='relu'),
+            tf.keras.layers.Flatten(),
+        ],
+        decoder=[
+            tf.keras.layers.Dense(units=2*2*128, activation=tf.nn.relu),
+            tf.keras.layers.Reshape(target_shape=(2, 2, 128)),
+            tf.keras.layers.Conv2DTranspose(filters=32, kernel_size=3, strides=2, padding='same', activation='relu'),
+            tf.keras.layers.Conv2DTranspose(filters=32, kernel_size=3, strides=2, padding='same', activation='relu'),
+            tf.keras.layers.Conv2DTranspose(filters=32, kernel_size=3, strides=2, padding='same', activation='relu'),
+            tf.keras.layers.Conv2DTranspose(filters=16, kernel_size=3, strides=2, padding='same', activation='relu'),
+            tf.keras.layers.Conv2DTranspose(filters=16, kernel_size=3, strides=2, padding='same', activation='relu'),
+            tf.keras.layers.Conv2DTranspose(filters=9, kernel_size=2, strides=1, padding='same', activation='sigmoid'),
+        ]
+    )
 
     autoencoder.compile(optimizer=tf.keras.optimizers.Adam())
 
-    latent_output = autoencoder.encoder.get_layer('latent_space').output # 256 - 128 for mean and 128 for logvar
-    encoder = tf.keras.Model(inputs=autoencoder.encoder.input, outputs=latent_output[:, :latent_dim], name='encoder')
+    encoder = autoencoder.get_encoder()
 
     # Build the autoencoder model by calling it on a batch of data
     autoencoder(tf.random.normal([1, 64, 64, 9]))
@@ -226,16 +193,17 @@ def get_curiosity():
 
     return model
     
+
 actor = get_actor()
 critic = get_critic()
 curiosity = get_curiosity()
 encoder, autoencoder = get_curiosity_autoencoder()
 
+
 policy_optimizer = tf.keras.optimizers.Adam(learning_rate=params.actor_lr)
 value_optimizer = tf.keras.optimizers.Adam(learning_rate=params.critic_lr)
 curiosity_optimizer = tf.keras.optimizers.Adam(learning_rate=params.critic_lr)
 autoencoder_optimizer = tf.keras.optimizers.Adam(learning_rate=params.critic_lr)
-
 
 def log_stats(stats, step):
     # list of kl, policy_loss, mean_ratio, mean_clipped_ratio, mean_advantage, mean_logprob
@@ -335,12 +303,12 @@ class TimeLogger:
 def run():
     running_avg = deque(maxlen=200)
 
-    memory = ppo.PPOReplayMemory(10_000, params.observation_space, gamma=params.discount_rate, lam=params.lam, gather_next_states=True)
+    memory = ppo.PPOReplayMemory(20_000, params.observation_space, gamma=params.discount_rate, lam=params.lam, gather_next_states=True)
 
-    env_step = enviroments.make_tensorflow_env_step_par(env, lambda x: x) # type: ignore
+    env_step = enviroments.make_tensorflow_env_step(env, lambda x: x) # type: ignore
     env_reset = enviroments.make_tensorflow_env_reset(env, lambda x: x) # type: ignore
 
-    runner = get_curius_ppo_runner_paraller(env_step)
+    runner = get_curius_ppo_runner_2(env_step)
     runner = tf.function(runner)
 
     action_space = tf.constant(params.action_space, dtype=tf.int32)
@@ -373,23 +341,24 @@ def run():
         curius_coef = tf.constant(params.curius_coef, dtype=tf.float32)
 
         with runner_logger:
-            (states, actions, rewards, values, log_probs, next_states, dones), total_rewards, curiosity_mean, curiosity_std = runner(initial_state, actor, critic, curiosity, encoder, max_steps_per_episode, action_space, curius_coef) # type: ignore
+            (states, actions, rewards, values, log_probs, next_states), total_rewards, curiosity_mean, curiosity_std = runner(initial_state, actor, critic, curiosity, encoder, max_steps_per_episode, action_space, curius_coef) # type: ignore
         
         with store_logger:
-            memory.add_multiple(states, actions, rewards, values, log_probs, next_states, dones)
+            memory.add(states, actions, rewards, values, log_probs, next_states)
         
         curiosity_sum = curiosity_mean*params.curius_coef*states.shape[0]
         
-        running_avg.append(tf.reduce_mean(total_rewards-curiosity_sum))
+        running_avg.append(total_rewards-curiosity_sum)
         avg = sum(running_avg)/len(running_avg)
 
-        tf.summary.scalar('reward', tf.reduce_mean(total_rewards-curiosity_sum), step=episode)
+        tf.summary.scalar('reward', total_rewards-curiosity_sum, step=episode)
         tf.summary.scalar('reward_avg', avg, step=episode)
-        tf.summary.scalar('curiosity_mean', tf.reduce_mean(curiosity_mean), step=episode)
-        tf.summary.scalar('curiosity_std', tf.reduce_mean(curiosity_std), step=episode)
-        tf.summary.scalar('curiosity_sum', tf.reduce_mean(curiosity_sum), step=episode)
+        tf.summary.scalar('lenght', states.shape[0], step=episode)
+        tf.summary.scalar('curiosity_mean', curiosity_mean, step=episode)
+        tf.summary.scalar('curiosity_std', curiosity_std, step=episode)
+        tf.summary.scalar('curiosity_sum', curiosity_sum, step=episode)
 
-        t.set_description(f"Reward: {tf.reduce_mean(total_rewards):.2f} - Reward(Raw): {tf.reduce_mean(total_rewards-curiosity_sum):.2f}  - Avg: {avg:.2f} - curiosity: {tf.reduce_mean(curiosity_mean):.2f} curiosity epoisode: {tf.reduce_mean(curiosity_sum):.2f}")
+        t.set_description(f"Reward: {total_rewards:.2f} - Reward(Raw): {total_rewards-curiosity_sum:.2f}  - Avg: {avg:.2f} - Iterations: {states.shape[0]} curiosity: {curiosity_mean:.2f} curiosity epoisode: {curiosity_sum:.2f}")
 
         episode_tf = tf.constant(episode, dtype=tf.int64)
 
@@ -403,7 +372,7 @@ def run():
                     batch = memory.sample(batch_size)
                     history = ppo.training_step_ppo(batch, actor, action_space, clip_ratio, policy_optimizer, episode_tf)
                     stats.append(history)
-            
+
             log_stats(stats, episode_tf)
 
             with train_critic_logger:
@@ -430,10 +399,11 @@ def run():
                     stats.append(float(history))
                 tf.summary.scalar('autoencoder_loss', np.mean(stats), step=episode_tf)
 
-                    # memory.reset()
+            # memory.reset()
         if int(episode+90) % 100 == 0 and int(episode) > 0:
             log_curiosity_predicton(curiosity, encoder, autoencoder, memory, episode_tf) 
-    
+        
+
         if episode % params.save_freq == 0 and episode > 0:
             NAME = f"{config.MODELS_DIR}{params.env_name}_{config.RUN_NAME}/{episode}/"
             
@@ -441,8 +411,6 @@ def run():
             critic.save(f"{NAME}critic", save_format="tf") # type: ignore
             curiosity.save(f"{NAME}curiosity", save_format="tf") # type: ignore
             autoencoder.save(f"{NAME}autoencoder", save_format="tf") # type: ignore
-        
-
 
 run()
 

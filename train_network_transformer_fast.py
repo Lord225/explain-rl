@@ -21,7 +21,7 @@ parser.add_argument("--resume", type=str, default=None, help="resume from a mode
 
 args = parser.parse_args()
 
-env = enviroments.ProcGenWrapper("caveflyer", 25, False, 3)
+env = enviroments.ProcGenWrapper("caveflyer", 10, False, 3)
 
 params = argparse.Namespace()
 
@@ -35,10 +35,10 @@ params.critic_lr = 3e-5
 params.action_space = 15
 params.observation_space_raw =  (64, 64, 9)
 params.observation_space = (64, 64, 9)
-params.encoding_size = 256
+params.encoding_size = 128
 
 params.episodes = 20000
-params.max_steps_per_episode = 400
+params.max_steps_per_episode = 200
 
 params.discount_rate = 0.99
 
@@ -49,16 +49,16 @@ params.clip_ratio = 0.20
 params.lam = 0.98
 
 # params.curius_coef = 0.013
-params.curius_coef = 0.0000003
+params.curius_coef = 0.000001
 
-params.batch_size = 256
-params.batch_size_curius = 256
+params.batch_size = 1024
+params.batch_size_curius = 512
 
 params.train_interval = 1
-params.iters = 400
-params.iters_courious = 400         
+params.iters = 100
+params.iters_courious = 100
 
-params.save_freq = 500
+params.save_freq = 100
 if args.resume is not None:
     params.resumed = 'resumed from: ' + args.resume
     # path has form of /path/to/model/episode so take last part of path
@@ -147,23 +147,25 @@ def get_curiosity_autoencoder():
         encoder=[
             tf.keras.layers.InputLayer(input_shape=(64, 64, 9), dtype=tf.float32),
             tf.keras.layers.Lambda(lambda x: tf.cast(x, tf.float32) / 255.0),
-            tf.keras.layers.Conv2D(filters=8, kernel_size=3, strides=(2, 2), activation='relu', padding='same'),    
-            tf.keras.layers.Conv2D(filters=16, kernel_size=3, strides=(2, 2), activation='relu',padding='same'),
-            tf.keras.layers.Conv2D(filters=32, kernel_size=3, strides=(2, 2), activation='relu', padding='same'),
-            tf.keras.layers.Conv2D(filters=64, kernel_size=3, strides=(2, 2), activation='relu', padding='same'),
-            tf.keras.layers.Conv2D(filters=64, kernel_size=3, strides=(1, 1), activation='relu'),
+            tf.keras.layers.Conv2D(filters=8, kernel_size=3, strides=(2, 2), activation='relu'),
+            tf.keras.layers.Conv2D(filters=16, kernel_size=3, strides=(2, 2), activation='relu'),
+            tf.keras.layers.Conv2D(filters=32, kernel_size=3, strides=(2, 2), activation='relu'),
+            tf.keras.layers.Conv2D(filters=64, kernel_size=3, strides=(2, 2), activation='relu'),
+            tf.keras.layers.Conv2D(filters=128, kernel_size=3, strides=(2, 2), activation='relu'),
+            tf.keras.layers.Flatten(),
+            tf.keras.layers.Dense(128, activation='relu'),
             tf.keras.layers.Flatten(),
         ],
         decoder=[
-            tf.keras.layers.Dense(units=2*2*128, activation=tf.nn.relu),
-            tf.keras.layers.Reshape(target_shape=(2, 2, 128)),
+            tf.keras.layers.Dense(units=2*2*32, activation=tf.nn.relu),
+            tf.keras.layers.Reshape(target_shape=(2, 2, 32)),
             tf.keras.layers.Conv2DTranspose(filters=32, kernel_size=3, strides=2, padding='same', activation='relu'),
             tf.keras.layers.Conv2DTranspose(filters=32, kernel_size=3, strides=2, padding='same', activation='relu'),
             tf.keras.layers.Conv2DTranspose(filters=32, kernel_size=3, strides=2, padding='same', activation='relu'),
             tf.keras.layers.Conv2DTranspose(filters=16, kernel_size=3, strides=2, padding='same', activation='relu'),
             tf.keras.layers.Conv2DTranspose(filters=16, kernel_size=3, strides=2, padding='same', activation='relu'),
             tf.keras.layers.Conv2DTranspose(filters=9, kernel_size=2, strides=1, padding='same', activation='sigmoid'),
-        ]
+    ]
     )
 
     autoencoder.compile(optimizer=tf.keras.optimizers.Adam())
@@ -305,9 +307,9 @@ class TimeLogger:
             tf.summary.scalar(self.name, np.mean(self.times), step=step)
     
 def run():
-    running_avg = deque(maxlen=200)
+    running_avg = deque(maxlen=50)
 
-    memory = ppo.PPOReplayMemory(10_000, params.observation_space, gamma=params.discount_rate, lam=params.lam, gather_next_states=True)
+    memory = ppo.PPOReplayMemory(50_000, params.observation_space, gamma=params.discount_rate, lam=params.lam, gather_next_states=True)
 
     env_step = enviroments.make_tensorflow_env_step_par(env, lambda x: x) # type: ignore
     env_reset = enviroments.make_tensorflow_env_reset(env, lambda x: x) # type: ignore

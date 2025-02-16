@@ -175,6 +175,7 @@ def get_curius_ppo_runner_paraller(tf_env_step: Callable[[tf.Tensor], Tuple[tf.T
             env_actions: int,
             curius_coef: float,
             ):
+        # store on cpu
         states = tf.TensorArray(dtype=tf.uint8, size=0, dynamic_size=True)
         actions = tf.TensorArray(dtype=tf.int32, size=0, dynamic_size=True)
         rewards = tf.TensorArray(dtype=tf.float32, size=0, dynamic_size=True)

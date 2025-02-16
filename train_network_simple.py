@@ -35,7 +35,7 @@ params.observation_space_raw =  (64, 64, 9)
 params.observation_space = (64, 64, 9)
 params.encoding_size = 128
 
-params.episodes = 20000
+params.episodes = 50000
 params.max_steps_per_episode = 200
 
 params.discount_rate = 0.99
