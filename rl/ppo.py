@@ -51,37 +51,37 @@ class PPOReplayMemory:
     def add_tf(self, states, actions, rewards, values, logprobabilities, next_states,
                states_buffer, advantages_buffer, actions_buffer, rewards_buffer, return_buffer, logprobability_buffer, next_states_buffer,
                gamma, lam, max_size, count):
-        
-        size = len(states)
-        indices = tf.range(count, count + size) % max_size
-        
-        states_buffer = tf.tensor_scatter_nd_update(states_buffer, indices[:, None], states)
-        actions_buffer = tf.tensor_scatter_nd_update(actions_buffer, indices[:, None], actions)
-        rewards_buffer = tf.tensor_scatter_nd_update(rewards_buffer, indices[:, None], rewards)
-        logprobability_buffer = tf.tensor_scatter_nd_update(logprobability_buffer, indices[:, None], logprobabilities)
+        with tf.device('/CPU:0'):
+            size = len(states)
+            indices = tf.range(count, count + size) % max_size
+            
+            states_buffer = tf.tensor_scatter_nd_update(states_buffer, indices[:, None], states)
+            actions_buffer = tf.tensor_scatter_nd_update(actions_buffer, indices[:, None], actions)
+            rewards_buffer = tf.tensor_scatter_nd_update(rewards_buffer, indices[:, None], rewards)
+            logprobability_buffer = tf.tensor_scatter_nd_update(logprobability_buffer, indices[:, None], logprobabilities)
 
-        if next_states_buffer is not None:
-            next_states_buffer = tf.tensor_scatter_nd_update(next_states_buffer, indices[:, None], next_states)
-        
-        count = (count + size) % max_size
+            if next_states_buffer is not None:
+                next_states_buffer = tf.tensor_scatter_nd_update(next_states_buffer, indices[:, None], next_states)
+            
+            count = (count + size) % max_size
 
-        # finish trajectory
-        rewards = tf.concat([rewards, [0.0]], axis=0)
-        values = tf.concat([values, [0.0]], axis=0)
+            # finish trajectory
+            rewards = tf.concat([rewards, [0.0]], axis=0)
+            values = tf.concat([values, [0.0]], axis=0)
 
-        deltas = rewards[:-1] + gamma * values[1:] - values[:-1] # type: ignore
+            deltas = rewards[:-1] + gamma * values[1:] - values[:-1] # type: ignore
 
-        advantages = discounted_cumulative_sums_tf(
-            deltas, gamma * lam
-        )
-        returns = discounted_cumulative_sums_tf(
-            rewards, gamma
-        )[:-1] # type: ignore
+            advantages = discounted_cumulative_sums_tf(
+                deltas, gamma * lam
+            )
+            returns = discounted_cumulative_sums_tf(
+                rewards, gamma
+            )[:-1] # type: ignore
 
-        advantages_buffer = tf.tensor_scatter_nd_update(advantages_buffer, indices[:, None], advantages)
-        return_buffer = tf.tensor_scatter_nd_update(return_buffer, indices[:, None], returns)
+            advantages_buffer = tf.tensor_scatter_nd_update(advantages_buffer, indices[:, None], advantages)
+            return_buffer = tf.tensor_scatter_nd_update(return_buffer, indices[:, None], returns)
 
-        return states_buffer, advantages_buffer, actions_buffer, rewards_buffer, return_buffer, logprobability_buffer, next_states_buffer, count
+            return states_buffer, advantages_buffer, actions_buffer, rewards_buffer, return_buffer, logprobability_buffer, next_states_buffer, count
     
     @tf.function(reduce_retracing=True)
     def add_multiple_tf(self, states, actions, rewards, values, logprobabilities, next_states, dones,

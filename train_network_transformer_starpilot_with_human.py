@@ -10,7 +10,7 @@ from advanced_networks import VisualTransformer
 from advanced_networks.VAE import VariationalAutoencoder
 from rl.common import splash_screen
 import rl.config as config
-from rl.episode_runner import get_exp_from_buffer
+from rl.episode_runner import get_curius_ppo_runner_2, get_exp_from_buffer
 import rl.ppo as ppo
 import rl.enviroment as enviroments
 import os
@@ -21,40 +21,40 @@ parser.add_argument("--resume", type=str, default=None, help="resume from a mode
 
 args = parser.parse_args()
 
-env = enviroments.ProcGenWrapper("caveflyer", 1, False, 3)
+env = enviroments.ProcGenWrapper("starpilot", 1, False, 3)
 
 params = argparse.Namespace()
 
 params.env_name = env.env
-params.version = "v2"
+params.version = "v2.1"
 params.DRY_RUN = False
 
-params.actor_lr  = 1e-5
-params.critic_lr = 3e-5
+params.actor_lr  = 1e-6
+params.critic_lr = 3e-6
 
 params.action_space = 15
 params.observation_space_raw =  (64, 64, 9)
 params.observation_space = (64, 64, 9)
 params.encoding_size = 256
 
-params.episodes = 20000
-params.max_steps_per_episode = 150
+params.episodes = 40000
+params.max_steps_per_episode = 250
 
 params.discount_rate = 0.99
 
-params.eps_decay_len = 1000
-params.eps_min = 0.1
+params.eps_decay_len = 10
+params.eps_min = 0.15
 
 params.clip_ratio = 0.20
 params.lam = 0.98
 
 # params.curius_coef = 0.013
-params.curius_coef = 0.0000003
+params.curius_coef = 0.000001
 
-params.batch_size = 256
-params.batch_size_curius = 256
+params.batch_size = 128
+params.batch_size_curius = 128
 
-params.train_interval = 20    
+params.train_interval = 10
 params.iters = 400
 params.iters_courious = 400            
 
@@ -76,20 +76,21 @@ def get_actor():
         return model
 
     model = VisualTransformer.ViT(
-        image_size=(64, 64, 9),
-        patch_size=4,
-        num_layers=3,
-        hidden_size=64,
-        num_heads=2,
+        image_size=(66, 66, 9),
+        patch_size=6,
+        num_layers=8,
+        hidden_size=32,
+        num_heads=4,
         name='actor',
-        mlp_dim=64,
+        mlp_dim=16,
         classes=15,
         dropout=0.1,
         activation='linear',
-        representation_size=32,
+        representation_size=16,
         preprocess=tf.keras.Sequential(
             [
                 tf.keras.layers.InputLayer(input_shape=(64, 64, 9), dtype=tf.float32),
+                tf.keras.layers.Lambda(lambda x: tf.pad(x, [[0, 0], [2, 0], [2, 0], [0, 0]])),
                 tf.keras.layers.Lambda(lambda x: tf.cast(x, tf.float32) / 255.0),
             ]
         )
@@ -101,32 +102,28 @@ def get_actor():
 
     return model
 
+
 def get_critic():
     if args.resume is not None:
         model = tf.keras.models.load_model(args.resume+'/critic')
         print("loaded model from", args.resume)
         return model
 
-    model = VisualTransformer.ViT(
-        image_size=(64, 64, 9),
-        patch_size=4,
-        num_layers=3,
-        hidden_size=64,
-        num_heads=2,
-        name='critic',
-        mlp_dim=64,
-        classes=1,
-        dropout=0.1,
-        activation='linear',
-        representation_size=32,
-        preprocess=tf.keras.Sequential(
-            [
-                tf.keras.layers.InputLayer(input_shape=(64, 64, 9), dtype=tf.float32),
-                tf.keras.layers.Lambda(lambda x: tf.cast(x, tf.float32) / 255.0),
-            ]
-        )
-    )
-    model.build((None, 64, 64, 9))
+    observation_input = tf.keras.Input(shape=params.observation_space, dtype=tf.uint8)
+    x = tf.cast(observation_input, tf.float32)
+    x = x / 255.0 # type: ignore
+    x = tf.keras.layers.Conv2D(16, 3, strides=2, activation=tf.nn.elu)(x)
+    x = tf.keras.layers.MaxPooling2D()(x)
+    x = tf.keras.layers.Conv2D(32, 3, strides=2, activation=tf.nn.elu)(x)
+    x = tf.keras.layers.MaxPooling2D()(x)
+    x = tf.keras.layers.Conv2D(32, 3, strides=2, activation=tf.nn.elu)(x)
+    x = tf.keras.layers.Flatten()(x)
+    x = tf.keras.layers.Dense(32, activation=tf.nn.elu)(x)
+    x = tf.keras.layers.Dense(32, activation=tf.nn.elu)(x)
+
+
+    value = tf.squeeze(tf.keras.layers.Dense(1)(x))
+    model = tf.keras.Model(inputs=observation_input, outputs=value, name='critic')
     model.summary()
     return model
 
@@ -245,7 +242,6 @@ def log_curiosity_predicton(curiosity, encoder, autoencoder, memory: ppo.PPORepl
         # build one collage of images for each state
         # put the 3 frames together, then the 3 predicted frames together, then the 3 next frames together using cv2
         image = np.zeros((256, 192, 3), dtype=np.float32)
-        
 
         states = tf.cast(states, tf.float32) / 255.0
         next_states = tf.cast(next_states, tf.float32) / 255.0
@@ -303,16 +299,63 @@ class TimeLogger:
     def log(self, step):
         if len(self.times) > 0:
             tf.summary.scalar(self.name, np.mean(self.times), step=step)
+
+PATH = "F:\pyrepos\explain-rl\collect_exp\database"
+
+import h5py
+def load_exp(path, curius_coef, action_space, memory):
+    # 20250222-123436_starpilot_4.0.h5
+    # laod all data from folder that has starpilot in name
+    all_files = os.listdir(path)
+    files = [f for f in all_files if 'starpilot' in f]
     
+    data = []
+    for file in files:
+        with h5py.File(os.path.join(path, file), 'r') as f:
+            states = f['states'][:]
+            actions = f['actions'][:]
+            rewards = f['rewards'][:]
+
+            data.append((states, actions, rewards))
+    print('loaded data', len(data), 'files')
+
+    # total lenght
+    total_len = sum([len(x[0]) for x in data])
+    print('total lenght', total_len)
+    
+
+    for _observations, _actions, _rewards in data:
+        # print(_observations.shape, _actions.shape, _rewards.shape)
+        # conver to tensors
+        lenght = _actions.shape[0]
+        if lenght < 2:
+            continue
+
+        _observations = tf.constant(_observations, dtype=tf.uint8)
+        _actions = tf.constant(_actions, dtype=tf.int32)
+        _rewards = tf.constant(_rewards, dtype=tf.float32)
+
+        (states, actions, rewards, values, log_probs, next_states), total_rewards, curiosity_mean, curiosity_std = get_exp_from_buffer(
+            _observations, _actions, _rewards, actor, critic, curiosity, encoder, action_space, curius_coef
+        ) # type: ignore
+        actions = tf.squeeze(actions)
+        log_probs = tf.squeeze(log_probs)
+        values = tf.squeeze(values)
+        print(states.shape, _observations.shape)
+        print(float(tf.reduce_mean(log_probs)), float(tf.reduce_mean(values)))
+        memory.add(states, actions, rewards, values, log_probs, next_states)
+
+
 def run():
     running_avg = deque(maxlen=200)
 
     memory = ppo.PPOReplayMemory(10_000, params.observation_space, gamma=params.discount_rate, lam=params.lam, gather_next_states=True)
+    human_examples_memory = ppo.PPOReplayMemory(10_000, params.observation_space, gamma=params.discount_rate, lam=params.lam, gather_next_states=True)
 
     env_step = enviroments.make_tensorflow_env_step(env, lambda x: x) # type: ignore
     env_reset = enviroments.make_tensorflow_env_reset(env, lambda x: x) # type: ignore
 
-    runner = get_exp_from_buffer(env_step)
+    runner = get_curius_ppo_runner_2(env_step)
     runner = tf.function(runner)
 
     action_space = tf.constant(params.action_space, dtype=tf.int32)
@@ -338,14 +381,16 @@ def run():
 
     t = tqdm.tqdm(range(BASE_EPISODE, params.episodes))
     for episode in t:
+        curius_coef = tf.constant(params.curius_coef, dtype=tf.float32)
+        epsilon = tf.constant(params.eps_min + (params.eps_decay_len - episode) * (1.0 - params.eps_min) / params.eps_decay_len, dtype=tf.float32)
+
+
         initial_state = env_reset()
 
         initial_state = tf.constant(initial_state, dtype=tf.uint8)
         
-        curius_coef = tf.constant(params.curius_coef, dtype=tf.float32)
-
         with runner_logger:
-            (states, actions, rewards, values, log_probs, next_states), total_rewards, curiosity_mean, curiosity_std = runner(initial_state, actor, critic, curiosity, encoder, max_steps_per_episode, action_space, curius_coef) # type: ignore
+            (states, actions, rewards, values, log_probs, next_states), total_rewards, curiosity_mean, curiosity_std = runner(initial_state, actor, critic, curiosity, encoder, max_steps_per_episode, action_space, curius_coef, epsilon) # type: ignore
         
         with store_logger:
             memory.add(states, actions, rewards, values, log_probs, next_states)
@@ -366,14 +411,20 @@ def run():
 
         episode_tf = tf.constant(episode, dtype=tf.int64)
 
+        if (int(episode) % 500 == 0 and int(episode) > 0) or int(episode) == 10:
+            load_exp(PATH, curius_coef, action_space, human_examples_memory)
+
         if episode % 10 == 0:
             log_timings(episode_tf)
 
         if len(memory) >= batch_size and int(episode) % params.train_interval == 0 and int(episode) > 0:
             stats = [] # kl, policy_loss, mean_ratio, mean_clipped_ratio, mean_advantage, mean_logprob
             with train_ppo_logger:
-                for _ in range(params.iters):
-                    batch = memory.sample(batch_size)
+                for i in range(params.iters):
+                    if i % 5 == 0 and len(human_examples_memory) > batch_size:
+                        batch = human_examples_memory.sample(batch_size) 
+                    else: 
+                        batch = memory.sample(batch_size)
                     history = ppo.training_step_ppo(batch, actor, action_space, clip_ratio, policy_optimizer, episode_tf)
                     stats.append(history)
 
@@ -381,15 +432,18 @@ def run():
 
             with train_critic_logger:
                 stats = []
-                for _ in range(params.iters):
-                    batch = memory.sample_critic(batch_size)
+                for i in range(params.iters):
+                    if i % 5 == 0 and len(human_examples_memory) > batch_size:
+                        batch = human_examples_memory.sample_critic(batch_size)
+                    else:
+                        batch = memory.sample_critic(batch_size)
                     history = ppo.training_step_critic(batch, critic, value_optimizer, episode_tf)
                     stats.append(float(history))
                 tf.summary.scalar('critic_loss', np.mean(stats), step=episode_tf)
 
             with train_curiosity_logger:
                 stats = []
-                for _ in range(params.iters_courious):
+                for i in range(params.iters_courious):
                     batch = memory.sample_encoded_curiosity(batch_size_curius, encoder)
                     history = ppo.training_step_curiosty(batch, curiosity, curiosity_optimizer, action_space,  episode_tf)
                     stats.append(float(history))

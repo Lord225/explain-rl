@@ -274,7 +274,12 @@ class ViT(tf.keras.Model):
         return x
     
     def get_attentions(self, inputs):
-        x = self.embedding(inputs)
+        if self.preprocess is not None:
+            x = self.preprocess(inputs)
+        else:
+            x = inputs
+
+        x = self.embedding(x)
         x = tf.keras.layers.Reshape((x.shape[1] * x.shape[2], x.shape[3]))(x)
         x = self.class_token(x)
         x = self.pos_embed(x)
@@ -317,10 +322,10 @@ def attention_map(model: ViT, image: np.ndarray):
     grid_size = img_height // model.patch_size
 
     # Prepare the input
-    X = cv2.resize(image, (img_height, img_width)).reshape(1, img_height, img_width, channel)
+    X = cv2.resize(np.squeeze(image), (img_height, img_width)).reshape(1, img_height, img_width, channel)
 
     weights = model.get_attentions(X)
-    print(weights.shape)
+
     num_layers = weights.shape[0]
     num_heads = weights.shape[1]
     reshaped = weights.reshape(

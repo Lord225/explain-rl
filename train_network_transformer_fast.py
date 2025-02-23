@@ -10,7 +10,7 @@ from advanced_networks import VisualTransformer
 from advanced_networks.VAE import VariationalAutoencoder
 from rl.common import splash_screen
 import rl.config as config
-from rl.episode_runner import get_curius_ppo_runner_2, get_curius_ppo_runner_paraller
+from rl.episode_runner import get_exp_from_buffer, get_curius_ppo_runner_paraller
 import rl.ppo as ppo
 import rl.enviroment as enviroments
 import os

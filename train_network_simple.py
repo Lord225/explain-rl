@@ -8,7 +8,7 @@ import argparse
 import tqdm
 from rl.common import splash_screen
 import rl.config as config
-from rl.episode_runner import get_curius_ppo_runner_2
+from rl.episode_runner import get_exp_from_buffer
 import rl.ppo as ppo
 import rl.enviroment as enviroments
 import os
@@ -49,8 +49,8 @@ params.lam = 0.98
 # params.curius_coef = 0.013
 params.curius_coef = 0.0000003
 
-params.batch_size = 4096
-params.batch_size_curius = 512
+params.batch_size = 2048  # Reduced batch size
+params.batch_size_curius = 256  # Reduced batch size for curiosity
 
 params.train_interval = 10
 params.iters = 200
@@ -341,7 +341,7 @@ def run():
     env_step = enviroments.make_tensorflow_env_step(env, lambda x: x) # type: ignore
     env_reset = enviroments.make_tensorflow_env_reset(env, lambda x: x) # type: ignore
 
-    runner = get_curius_ppo_runner_2(env_step)
+    runner = get_exp_from_buffer(env_step)
     runner = tf.function(runner)
 
     action_space = tf.constant(params.action_space, dtype=tf.int32)

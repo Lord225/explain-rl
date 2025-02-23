@@ -57,8 +57,7 @@ class ProcGenWrapper(gym3.Wrapper):
             frame = obs[0][0, :, :, :3]
             # resize
             frame = cv2.resize(frame, (frame.shape[1]*8, frame.shape[0]*8), interpolation=cv2.INTER_NEAREST)
-            cv2.imshow("Normal", frame)
-            cv2.waitKey(16)
+            return frame
 
             
     

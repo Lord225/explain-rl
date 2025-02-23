@@ -10,7 +10,7 @@ from advanced_networks import VisualTransformer
 from advanced_networks.VAE import VariationalAutoencoder
 from rl.common import splash_screen
 import rl.config as config
-from rl.episode_runner import get_curius_ppo_runner_2
+from rl.episode_runner import get_exp_from_buffer
 import rl.ppo as ppo
 import rl.enviroment as enviroments
 import os
@@ -29,8 +29,8 @@ params.env_name = env.env
 params.version = "v2"
 params.DRY_RUN = False
 
-params.actor_lr  = 1e-5
-params.critic_lr = 3e-5
+params.actor_lr  = 1e-6
+params.critic_lr = 3e-6
 
 params.action_space = 15
 params.observation_space_raw =  (64, 64, 9)
@@ -49,12 +49,12 @@ params.clip_ratio = 0.20
 params.lam = 0.98
 
 # params.curius_coef = 0.013
-params.curius_coef = 0.0000007
+params.curius_coef = 0.0000001
 
 params.batch_size = 512
 params.batch_size_curius = 256
 
-params.train_interval = 10    
+params.train_interval = 10
 params.iters = 400
 params.iters_courious = 400            
 
@@ -303,12 +303,12 @@ class TimeLogger:
 def run():
     running_avg = deque(maxlen=200)
 
-    memory = ppo.PPOReplayMemory(20_000, params.observation_space, gamma=params.discount_rate, lam=params.lam, gather_next_states=True)
+    memory = ppo.PPOReplayMemory(40_000, params.observation_space, gamma=params.discount_rate, lam=params.lam, gather_next_states=True)
 
     env_step = enviroments.make_tensorflow_env_step(env, lambda x: x) # type: ignore
     env_reset = enviroments.make_tensorflow_env_reset(env, lambda x: x) # type: ignore
 
-    runner = get_curius_ppo_runner_2(env_step)
+    runner = get_exp_from_buffer(env_step)
     runner = tf.function(runner)
 
     action_space = tf.constant(params.action_space, dtype=tf.int32)
