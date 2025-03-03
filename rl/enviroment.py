@@ -20,7 +20,8 @@ class ProcGenWrapper(gym3.Wrapper):
     def reset(self):
         self.env_normal = ProcgenGym3Env(num=self.num, 
                             env_name=self.env, 
-                            distribution_mode="easy", 
+                            distribution_mode="easy",
+                            use_backgrounds=False,
                             render_mode="rgb_array",
                             )
         self.env_mono = ProcgenGym3Env(num=self.num,

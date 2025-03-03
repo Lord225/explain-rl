@@ -37,7 +37,7 @@ params.observation_space_raw =  (64, 64, 9)
 params.observation_space = (64, 64, 9)
 params.encoding_size = 256
 
-params.episodes = 40000
+params.episodes = 200_000
 params.max_steps_per_episode = 250
 
 params.discount_rate = 0.99
@@ -49,14 +49,14 @@ params.clip_ratio = 0.20
 params.lam = 0.98
 
 # params.curius_coef = 0.013
-params.curius_coef = 0.000001
+params.curius_coef = 0.00000005
 
 params.batch_size = 128
 params.batch_size_curius = 128
 
-params.train_interval = 10
-params.iters = 400
-params.iters_courious = 400            
+params.train_interval = 20
+params.iters = 100
+params.iters_courious = 100            
 
 params.save_freq = 500
 if args.resume is not None:
@@ -349,7 +349,7 @@ def load_exp(path, curius_coef, action_space, memory):
 def run():
     running_avg = deque(maxlen=200)
 
-    memory = ppo.PPOReplayMemory(10_000, params.observation_space, gamma=params.discount_rate, lam=params.lam, gather_next_states=True)
+    memory = ppo.PPOReplayMemory(20_000, params.observation_space, gamma=params.discount_rate, lam=params.lam, gather_next_states=True)
     human_examples_memory = ppo.PPOReplayMemory(10_000, params.observation_space, gamma=params.discount_rate, lam=params.lam, gather_next_states=True)
 
     env_step = enviroments.make_tensorflow_env_step(env, lambda x: x) # type: ignore
