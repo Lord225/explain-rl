@@ -17,6 +17,8 @@ class ProcGenWrapper(gym3.Wrapper):
         self.frame_stack_count = frame_stack_count
         self.human = human
 
+        self.reset()
+
     def reset(self):
         self.env_normal = ProcgenGym3Env(num=self.num, 
                             env_name=self.env, 
@@ -42,7 +44,7 @@ class ProcGenWrapper(gym3.Wrapper):
 
         states = self.env_normal.callmethod("get_state")
         self.env_mono.callmethod("set_state", states)
-
+        self.ob_space = self.env_normal.ob_space
         self.render()
 
         if self.human:
@@ -72,20 +74,29 @@ class ProcGenWrapper(gym3.Wrapper):
         else:
             obs = obs_normal['rgb']
         
-        return obs, rew_normal, first_normal
+        return rew_normal, {"rgb": obs}, first_normal
     
-              
-    def step(self, action):
+    def act(self, action):
         if self.return_segments:
             self.env_mono.act(action)
 
         self.env_normal.act(action)
+    
+      
+    def step(self, action):
+        self.act(action)
 
-        raw_obs, rew, first = self.observe()
+        rew, raw_obs, first = self.observe()
 
-        self.frame_stack.append(raw_obs)
+        self.frame_stack.append(raw_obs['rgb'])
 
         return np.concatenate(self.frame_stack, axis=3, dtype=np.uint8), rew, first
+    
+    def callmethod(self, method, *args):
+        return self.env_normal.callmethod(method, *args)
+    
+    def get_info(self):
+        return self.env_normal.get_info()
     
     
 ObservationTransformer = Callable[[Any], np.ndarray]

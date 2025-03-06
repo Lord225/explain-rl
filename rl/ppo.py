@@ -231,24 +231,26 @@ class PPOReplayMemory:
         gamma = tf.constant(self.gamma, dtype=tf.float32)
         lam = tf.constant(self.lam, dtype=tf.float32)
 
-        states_buffer, advantages_buffer, actions_buffer, rewards_buffer, return_buffer, logprobability_buffer, next_states_buffer, new_count = self.add_tf(
-                    observations, 
-                    actions, 
-                    rewards, 
-                    values, 
-                    logprobabilities,
-                    next_states,
-                    self.states_buffer, 
-                    self.advantages_buffer, 
-                    self.actions_buffer, 
-                    self.rewards_buffer, 
-                    self.return_buffer, 
-                    self.logprobability_buffer,
-                    self.next_states_buffer,
-                    gamma, 
-                    lam, 
-                    max_size, 
-                    count) # type: ignore
+
+        with tf.device('/CPU:0'):
+            states_buffer, advantages_buffer, actions_buffer, rewards_buffer, return_buffer, logprobability_buffer, next_states_buffer, new_count = self.add_tf(
+                        observations, 
+                        actions, 
+                        rewards, 
+                        values, 
+                        logprobabilities,
+                        next_states,
+                        self.states_buffer, 
+                        self.advantages_buffer, 
+                        self.actions_buffer, 
+                        self.rewards_buffer, 
+                        self.return_buffer, 
+                        self.logprobability_buffer,
+                        self.next_states_buffer,
+                        gamma, 
+                        lam, 
+                        max_size, 
+                        count) # type: ignore
         
         self.states_buffer = states_buffer
         self.advantages_buffer = advantages_buffer

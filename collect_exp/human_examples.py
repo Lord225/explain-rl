@@ -84,7 +84,7 @@ class ProcgenInteractiveCollector(Interactive):
         states = np.squeeze(states)
 
         run_datetime = datetime.now().strftime("%Y%m%d-%H%M%S")
-        env_name = "starpilot"
+        env_name = "climber"
         filename = f"{run_datetime}_{env_name}_{final_score}.h5"
 
         with h5py.File(os.path.join(path, filename), 'w') as f:
@@ -108,7 +108,7 @@ def make_interactive(vision, record_dir, **kwargs):
     else:
         ob_key = "rgb"
 
-    env = enviroment.ProcGenWrapper("starpilot", num=1, return_segments=False, frame_stack_count=3)
+    env = enviroment.ProcGenWrapper("climber", num=1, return_segments=False, frame_stack_count=3)
     if record_dir is not None:
         env = VideoRecorderWrapper(
             env=env, directory=record_dir, ob_key=ob_key, info_key=info_key
