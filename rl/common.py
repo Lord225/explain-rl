@@ -1,8 +1,8 @@
 from argparse import Namespace
 import stat
 import tensorflow as tf
-from typing import Callable, List, Tuple, Union,NamedTuple
-from tensorboard.plugins.hparams import api as hp
+from typing import Callable, NamedTuple
+
 
 class ReplayHistoryType(NamedTuple):
     states: tf.Tensor

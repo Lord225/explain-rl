@@ -59,8 +59,6 @@ class ProcGenWrapper(gym3.Wrapper):
             # resize
             frame = cv2.resize(frame, (frame.shape[1]*8, frame.shape[0]*8), interpolation=cv2.INTER_NEAREST)
             return frame
-
-            
     
     def observe(self):
         rew_normal, obs_normal, first_normal = self.env_normal.observe()
