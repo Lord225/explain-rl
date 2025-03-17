@@ -1,4 +1,6 @@
 import argparse
+from collections import deque
+import os
 from typing import Any, Optional, Tuple, Union
 import gymnasium as gym
 from procgen import ProcgenEnv
@@ -13,15 +15,29 @@ import cv2
 from procgenwrapper import ProcGenWrapper
 from rl.common import splash_screen
 
+parser = argparse.ArgumentParser()
+parser.add_argument("--resume", type=str, default=None, help="resume from a model") 
+
+args = parser.parse_args()
 
 params = argparse.Namespace()
 
 params.env_name = "starpilot"
-params.version = "v3.0"
+params.version = "v3.1"
 params.DRY_RUN = False
+params.resume = args.resume
+if args.resume is not None:
+    params.resumed = 'resumed from: ' + args.resume
+    # path has form of /path/to/model/episode so take last part of path
+    # 20250311-160440-FigurePictureMemory_10_v3.0
+    # parse _10_ 
+    BASE_EPISODE = int(args.resume.split("_")[-2])
+else:
+    params.resumed = 'not resumed'
+    BASE_EPISODE = 0
 
 from stable_baselines3.common.policies import ActorCriticPolicy
-
+from vit_pytorch import ViT
 
 class CustomNetwork(nn.Module):
     def __init__(
@@ -39,27 +55,25 @@ class CustomNetwork(nn.Module):
 
         # Policy network
         self.policy_net = nn.Sequential(
-            nn.Unflatten(1, (3, 64, 64)),
-            # feature_dim -> 64x64x3, use convolutional layers
-            nn.Conv2d(3, 32, kernel_size=8, stride=4),
-            nn.ReLU(),
-            nn.Conv2d(32, 32, kernel_size=4, stride=2),
-            nn.ReLU(),
-            nn.Conv2d(32, 32, kernel_size=3, stride=1),
-            nn.ReLU(),
-            nn.Conv2d(32, 32, kernel_size=2, stride=1),
-            nn.ReLU(),
-            nn.Conv2d(32, 32, kernel_size=2, stride=1),
-            nn.ReLU(),
-            nn.Flatten(),
-            nn.Linear(128, last_layer_dim_pi),
-            nn.ReLU(),
-            nn.Linear(last_layer_dim_pi, last_layer_dim_pi),
+            nn.Unflatten(1, (9, 64, 64)),
+            ViT(
+                image_size = 64,
+                patch_size = 4,
+                num_classes = self.latent_dim_pi,
+                dim = 64,
+                channels=9,
+                depth = 4,
+                heads = 4,
+                mlp_dim = 128,
+                dropout = 0.1,
+                emb_dropout = 0.1,
+            )
         )
+
         # Value network
         self.value_net = nn.Sequential(
-            nn.Unflatten(1, (3, 64, 64)),
-            nn.Conv2d(3, 32, kernel_size=8, stride=4),
+            nn.Unflatten(1, (9, 64, 64)),
+            nn.Conv2d(9, 32, kernel_size=8, stride=4),
             nn.ReLU(),
             nn.Conv2d(32, 32, kernel_size=4, stride=2),
             nn.ReLU(),
@@ -102,7 +116,6 @@ class CustomActorCriticPolicy(ActorCriticPolicy):
             **kwargs,
         )
 
-
     def _build_mlp_extractor(self) -> None:
         self.mlp_extractor = CustomNetwork(self.features_dim)
 
@@ -116,12 +129,35 @@ if __name__ == "__main__":
 
     train_summary_writer = SummaryWriter(config.LOG_DIR_ROOT + run_name + params.version) # type: ignore        
         
-    venv = ProcGenWrapper(env_name="starpilot", num_levels=1, start_level=0, distribution_mode="easy")
+    venv = ProcGenWrapper(env_name="starpilot", 
+                          num_levels=0, 
+                          start_level=0, 
+                          distribution_mode="easy")
 
     # Define and train model
-    model = PPO(CustomActorCriticPolicy, venv, verbose=1, tensorboard_log=config.LOG_DIR_ROOT)
+    model = PPO(CustomActorCriticPolicy, venv, verbose=1, tensorboard_log=config.LOG_DIR_ROOT, 
+                normalize_advantage=False,
+                batch_size=128,
+                n_steps=128*8*16,
+                n_epochs=3,
+                gamma=0.999,
+                gae_lambda=0.95,
+                clip_range=0.2,
+                ent_coef=0.01,
+                vf_coef=0.5,
+                max_grad_norm=0.5,
+                learning_rate=3e-4,
+                )
+    
+    print(f"Resumed from episode {BASE_EPISODE*100000}")
+    if BASE_EPISODE != 0:
+        # model.load(params.resume, venv, custom_objects={"CustomActorCriticPolicy": CustomActorCriticPolicy, "ViT": ViT})
+        print("Loading model from", params.resume, "episode", BASE_EPISODE*100000)
+        model = PPO.load(params.resume, print_system_info=True, env=venv, tensorboard_log=config.LOG_DIR_ROOT,
+                custom_objects={"CustomActorCriticPolicy": CustomActorCriticPolicy, "ViT": ViT})
 
-    for i in range(100):
+
+    for i in range(500):
         model.learn(total_timesteps=100000, log_interval=1, tb_log_name=f"{run_name}{params.version}", reset_num_timesteps=False, progress_bar=True)
 
         model.save(config.MODELS_DIR + f"{run_name}_{i}_{params.version}")

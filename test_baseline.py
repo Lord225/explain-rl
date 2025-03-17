@@ -4,10 +4,17 @@
 
 import cv2
 import ppo
-from train_network_baseline_custom_net import ProcGenWrapper
+from procgenwrapper import ProcGenWrapper
+import argparse
+
+parser = argparse.ArgumentParser()
+
+parser.add_argument("--resume", type=str, default=None, help="resume from a model")
+
+args = parser.parse_args()
 
 
-PATH = "/home/lord225/pyrepos/explain-rl/models/20250305-135940-GreatFewCoach_9_v3.0"
+PATH = args.resume
 model = ppo.PPO.load(PATH, print_system_info=True)
 
 
@@ -19,14 +26,14 @@ reward_sum = 0
 while True:
     action, _ = model.predict(obs)
 
-    obs, rew, done, _, _ = env.step(action[0])
+    obs, rew, done, _, _ = env.step(action)
 
     reward_sum += rew
 
     cv2.waitKey(32)
 
     if done:
-        print(reward_sum)9
+        print(reward_sum)
         reward_sum = 0
         obs, _ = env.reset()
 

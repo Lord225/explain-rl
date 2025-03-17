@@ -1,14 +1,14 @@
 from typing import Any, Callable, Tuple
-import gym3 
+import gymnasium as gym
 import numpy as np
 import tensorflow as tf
-from procgen import ProcgenGym3Env
+from procgen import ProcgenEnv
 from collections import deque
 import cv2
 
 # create environment overide the default seed
 
-class ProcGenWrapper(gym3.Wrapper):
+class ProcGenWrapper(gym.Env):
     UNIQUE_COLORS = np.array([(191, 255, 191), (191, 63, 191), (191, 255, 255), (127, 127, 255), (255, 127, 63), (0.0, 0.0, 0.0), (255, 191, 191), (255, 127, 127), (255, 191, 255), (127, 255, 127), (127, 63, 127), (63, 127, 127), (127, 63, 191), (127, 191, 63)], dtype=np.uint8)[np.newaxis]
     def __init__(self, env, num, return_segments, frame_stack_count, human=False):
         self.return_segments = return_segments
@@ -16,17 +16,19 @@ class ProcGenWrapper(gym3.Wrapper):
         self.env = env 
         self.frame_stack_count = frame_stack_count
         self.human = human
+        self.observation_space = gym.spaces.Box(low=0, high=255, shape=(64, 64, 3*frame_stack_count), dtype=np.uint8)
+        self.action_space = gym.spaces.Discrete(n=15)
 
         self.reset()
 
     def reset(self):
-        self.env_normal = ProcgenGym3Env(num=self.num, 
+        self.env_normal = ProcgenEnv(num=self.num, 
                             env_name=self.env, 
                             distribution_mode="easy",
                             use_backgrounds=False,
                             render_mode="rgb_array",
                             )
-        self.env_mono = ProcgenGym3Env(num=self.num,
+        self.env_mono = ProcgenEnv(num=self.num,
                             env_name=self.env, 
                             distribution_mode="easy", 
                             render_mode="rgb_array",
