@@ -139,14 +139,14 @@ if __name__ == "__main__":
                 normalize_advantage=False,
                 batch_size=128,
                 n_steps=128*8*16,
-                n_epochs=3,
+                n_epochs=16,
                 gamma=0.999,
                 gae_lambda=0.95,
                 clip_range=0.2,
                 ent_coef=0.01,
                 vf_coef=0.5,
                 max_grad_norm=0.5,
-                learning_rate=3e-4,
+                learning_rate=3e-5,
                 )
     
     print(f"Resumed from episode {BASE_EPISODE*100000}")

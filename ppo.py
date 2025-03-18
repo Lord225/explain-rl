@@ -52,6 +52,8 @@ class PPO(OnPolicyAlgorithm):
         seed: Optional[int] = None,
         device: Union[th.device, str] = "auto",
         _init_setup_model: bool = True,
+        curiosityNetwork: Optional[th.nn.Module] = None,
+        curiosityCoef: float = 0.0,
     ):
         super().__init__(
             policy,

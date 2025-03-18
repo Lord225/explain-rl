@@ -10,7 +10,7 @@ import cv2
 
 
 class ProcGenWrapper(gym.Env):
-    def __init__(self, num_envs=1, env_name="starpilot", num_levels=0, start_level=0, distribution_mode="easy", frame_stack_count=3, human=False):
+    def __init__(self, env_name="starpilot", num_envs=1, num_levels=0, start_level=0, distribution_mode="easy", frame_stack_count=3, human=False):
         super().__init__()
 
         # Create single-instance ProcgenEnv (num_envs=1)
