@@ -4,121 +4,272 @@ channels:
   - conda-forge
   - https://repo.anaconda.com/pkgs/main
   - https://repo.anaconda.com/pkgs/r
-  - https://repo.anaconda.com/pkgs/msys2
 dependencies:
-  - asttokens=3.0.0
-  - ca-certificates=2025.1.31
-  - colorama=0.4.6
-  - comm=0.2.2
-  - cpython=3.9.21
-  - cudatoolkit=11.2.2
-  - cudnn=8.1.0.77
-  - debugpy=1.8.12
-  - decorator=5.1.1
-  - exceptiongroup=1.2.2
-  - executing=2.1.0
-  - importlib-metadata=8.6.1
-  - ipykernel=6.29.5
-  - ipython=8.18.1
-  - jedi=0.19.2
-  - jupyter_client=8.6.3
-  - jupyter_core=5.7.2
-  - krb5=1.21.3
-  - libsodium=1.0.20
-  - matplotlib-inline=0.1.7
-  - nest-asyncio=1.6.0
-  - openssl=3.4.0
-  - packaging=24.2
-  - parso=0.8.4
-  - pickleshare=0.7.5
-  - pip=25.0
-  - platformdirs=4.3.6
-  - prompt-toolkit=3.0.50
-  - psutil=6.1.1
-  - pure_eval=0.2.3
-  - pygments=2.19.1
-  - python=3.9.21
-  - python-dateutil=2.9.0.post0
-  - python_abi=3.9
-  - pywin32=307
-  - pyzmq=26.2.1
-  - setuptools=75.8.0
-  - six=1.17.0
-  - sqlite=3.45.3
-  - stack_data=0.6.3
-  - tornado=6.4.2
-  - traitlets=5.14.3
-  - typing_extensions=4.12.2
-  - tzdata=2025a
-  - ucrt=10.0.22621.0
-  - vc=14.42
-  - vc14_runtime=14.42.34433
-  - vs2015_runtime=14.42.34433
-  - wcwidth=0.2.13
-  - wheel=0.45.1
-  - zeromq=4.3.5
-  - zipp=3.21.0
+  - _libgcc_mutex=0.1
+  - _openmp_mutex=5.1
+  - alsa-lib=1.2.13
+  - attr=2.5.1
+  - binutils=2.39
+  - binutils_impl_linux-64=2.39
+  - binutils_linux-64=2.39
+  - bzip2=1.0.8
+  - c-ares=1.18.1
   - c-compiler=1.3.0
+  - ca-certificates=2025.2.25
+  - cairo=1.18.0
   - cmake=3.21.3
+  - dbus=1.13.6
+  - expat=2.6.4
+  - font-ttf-dejavu-sans-mono=2.37
+  - font-ttf-inconsolata=3.000
+  - font-ttf-source-code-pro=2.038
+  - font-ttf-ubuntu=0.83
+  - fontconfig=2.14.2
+  - fonts-conda-ecosystem=1
+  - fonts-conda-forge=1
+  - freetype=2.12.1
+  - gcc=9.5.0
+  - gcc_impl_linux-64=9.5.0
+  - gcc_linux-64=9.5.0
+  - gettext=0.23.1
+  - gettext-tools=0.23.1
+  - giflib=5.2.2
+  - glib=2.80.2
+  - glib-tools=2.80.2
+  - graphite2=1.3.13
+  - gst-plugins-base=1.24.4
+  - gstreamer=1.24.4
+  - harfbuzz=8.5.0
+  - icu=73.2
+  - kernel-headers_linux-64=3.10.0
+  - keyutils=1.6.1
+  - krb5=1.21.3
+  - lame=3.100
+  - ld_impl_linux-64=2.39
+  - lerc=4.0.0
+  - libasprintf=0.23.1
+  - libasprintf-devel=0.23.1
+  - libcap=2.71
+  - libclang-cpp15=15.0.7
+  - libclang13=18.1.7
+  - libcups=2.3.3
+  - libcurl=8.4.0
+  - libdeflate=1.20
+  - libedit=3.1.20191231
+  - libev=4.33
+  - libevent=2.1.12
+  - libexpat=2.6.4
+  - libffi=3.4.4
+  - libflac=1.4.3
+  - libgcc=14.2.0
+  - libgcc-devel_linux-64=9.5.0
+  - libgcc-ng=14.2.0
+  - libgcrypt-lib=1.11.0
+  - libgettextpo=0.23.1
+  - libgettextpo-devel=0.23.1
+  - libglib=2.80.2
+  - libgomp=14.2.0
+  - libgpg-error=1.51
+  - libiconv=1.18
+  - libjpeg-turbo=3.0.0
+  - libllvm15=15.0.7
+  - libllvm18=18.1.7
+  - libnghttp2=1.52.0
+  - libogg=1.3.5
+  - libopus=1.3.1
+  - libpng=1.6.43
+  - libpq=16.8
+  - libsanitizer=9.5.0
+  - libsndfile=1.2.2
+  - libsqlite=3.46.0
+  - libssh2=1.11.0
+  - libstdcxx=14.2.0
+  - libstdcxx-ng=14.2.0
+  - libsystemd0=256.9
+  - libtiff=4.6.0
+  - libuuid=2.38.1
+  - libuv=1.43.0
+  - libvorbis=1.3.7
+  - libwebp=1.4.0
+  - libwebp-base=1.4.0
+  - libxcb=1.15
+  - libxkbcommon=1.7.0
+  - libxml2=2.12.7
+  - libzlib=1.2.13
+  - lz4-c=1.9.3
+  - mpg123=1.32.9
+  - mysql-common=8.3.0
+  - mysql-libs=8.3.0
+  - ncurses=6.4
+  - nspr=4.36
+  - nss=3.100
+  - openssl=3.4.1
+  - pcre2=10.43
+  - pip=25.0
+  - pixman=0.44.2
+  - pthread-stubs=0.4
+  - pulseaudio-client=17.0
+  - python=3.9.21
   - qt=5.15.8
+  - qt-main=5.15.8
+  - qt-webengine=5.15.8
+  - readline=8.2
+  - rhash=1.4.1
+  - setuptools=75.8.0
+  - sqlite=3.45.3
+  - sysroot_linux-64=2.17
+  - tk=8.6.14
+  - wheel=0.45.1
+  - xcb-util=0.4.0
+  - xcb-util-image=0.4.0
+  - xcb-util-keysyms=0.4.0
+  - xcb-util-renderutil=0.3.9
+  - xcb-util-wm=0.4.1
+  - xkeyboard-config=2.42
+  - xorg-compositeproto=0.4.2
+  - xorg-damageproto=1.2.1
+  - xorg-fixesproto=5.0
+  - xorg-inputproto=2.3.2
+  - xorg-kbproto=1.0.7
+  - xorg-libice=1.1.2
+  - xorg-libsm=1.2.5
+  - xorg-libx11=1.8.9
+  - xorg-libxau=1.0.12
+  - xorg-libxcomposite=0.4.6
+  - xorg-libxdamage=1.1.5
+  - xorg-libxdmcp=1.1.5
+  - xorg-libxext=1.3.4
+  - xorg-libxfixes=5.0.3
+  - xorg-libxi=1.7.10
+  - xorg-libxrandr=1.5.2
+  - xorg-libxrender=0.9.11
+  - xorg-libxtst=1.2.5
+  - xorg-randrproto=1.5.0
+  - xorg-recordproto=1.14.2
+  - xorg-renderproto=0.11.1
+  - xorg-util-macros=1.20.2
+  - xorg-xextproto=7.3.0
+  - xorg-xf86vidmodeproto=2.3.1
+  - xorg-xproto=7.0.31
+  - xz=5.6.4
+  - zlib=1.2.13
+  - zstd=1.5.6
   - pip:
       - absl-py==2.1.0
       - astunparse==1.6.3
-      - cachetools==5.5.1
+      - cachetools==5.5.2
       - certifi==2025.1.31
       - cffi==1.17.1
       - charset-normalizer==3.4.1
-      - cloudpickle==3.1.1
+      - click==8.1.8
+      - cloudpickle==1.2.2
       - contourpy==1.3.0
       - cycler==0.12.1
+      - decorator==5.2.1
+      - dm-reverb==0.14.0
+      - dm-tree==0.1.8
+      - einops==0.8.1
+      - faker==36.1.1
+      - farama-notifications==0.0.4
       - filelock==3.17.0
-      - flatbuffers==25.1.24
-      - fonttools==4.55.8
-      - gast==0.4.0
+      - flatbuffers==25.2.10
+      - fonttools==4.56.0
+      - fsspec==2025.2.0
+      - future==1.0.0
+      - gast==0.6.0
+      - gin-config==0.5.0
       - glcontext==3.0.0
       - glfw==1.12.0
       - google-auth==2.38.0
-      - google-auth-oauthlib==0.4.6
+      - google-auth-oauthlib==1.2.1
       - google-pasta==0.2.0
       - grpcio==1.70.0
-      - gym==0.26.2
+      - gym==0.15.7
       - gym-notices==0.0.8
       - gym3==0.3.3
-      - h5py==3.12.1
+      - gymnasium==1.0.0
+      - h5py==3.13.0
       - idna==3.10
       - imageio==2.37.0
       - imageio-ffmpeg==0.3.0
+      - importlib-metadata==8.6.1
       - importlib-resources==6.5.2
-      - keras==2.10.0
-      - keras-preprocessing==1.1.2
+      - jinja2==3.1.5
+      - joblib==1.4.2
+      - keras==2.15.0
       - kiwisolver==1.4.7
       - libclang==18.1.1
       - markdown==3.7
+      - markdown-it-py==3.0.0
       - markupsafe==3.0.2
       - matplotlib==3.9.4
+      - mdurl==0.1.2
+      - ml-dtypes==0.3.2
       - moderngl==5.12.0
+      - mpmath==1.3.0
+      - namex==0.0.8
+      - networkx==3.2.1
       - numpy==1.26.4
+      - nvidia-cublas-cu12==12.4.5.8
+      - nvidia-cuda-cupti-cu12==12.4.127
+      - nvidia-cuda-nvcc-cu12==12.5.82
+      - nvidia-cuda-nvrtc-cu12==12.4.127
+      - nvidia-cuda-runtime-cu12==12.4.127
+      - nvidia-cudnn-cu12==9.1.0.70
+      - nvidia-cufft-cu12==11.2.1.3
+      - nvidia-curand-cu12==10.3.5.147
+      - nvidia-cusolver-cu12==11.6.1.9
+      - nvidia-cusparse-cu12==12.3.1.170
+      - nvidia-cusparselt-cu12==0.6.2
+      - nvidia-nccl-cu12==2.21.5
+      - nvidia-nvjitlink-cu12==12.4.127
+      - nvidia-nvtx-cu12==12.4.127
       - oauthlib==3.2.2
       - opencv-python==4.11.0.86
       - opt-einsum==3.4.0
+      - optree==0.14.1
+      - packaging==24.2
+      - pandas==2.2.3
       - pillow==11.1.0
-      - procgen==0.10.7
-      - protobuf==3.19.6
+      - portpicker==1.6.0
+      - protobuf==4.25.6
+      - psutil==7.0.0
       - pyasn1==0.6.1
       - pyasn1-modules==0.4.1
       - pycparser==2.22
+      - pygame==2.1.3
+      - pyglet==1.5.0
+      - pygments==2.19.1
       - pyparsing==3.2.1
-      - pyt==1.0.5
+      - python-dateutil==2.9.0.post0
+      - pytz==2025.1
       - requests==2.32.3
       - requests-oauthlib==2.0.0
+      - rich==13.9.4
+      - rlds==0.1.8
       - rsa==4.9
-      - tensorboard==2.10.1
-      - tensorboard-data-server==0.6.1
-      - tensorboard-plugin-wit==1.8.1
-      - tensorflow==2.10.0
-      - tensorflow-estimator==2.10.0
-      - tensorflow-io-gcs-filesystem==0.31.0
+      - scipy==1.13.1
+      - six==1.17.0
+      - stable-baselines3==2.5.0
+      - sympy==1.13.1
+      - tensorboard==2.15.2
+      - tensorboard-data-server==0.7.2
+      - tensorboardx==2.6.2.2
+      - tensorflow==2.15.1
+      - tensorflow-estimator==2.15.0
+      - tensorflow-io-gcs-filesystem==0.37.1
+      - tensorflow-probability==0.23.0
       - termcolor==2.5.0
+      - tf-agents==0.19.0
+      - torch==2.6.0
+      - torch-tb-profiler==0.4.3
+      - torchvision==0.21.0
+      - tqdm==4.67.1
+      - triton==3.2.0
+      - typing-extensions==4.12.2
+      - tzdata==2025.1
       - urllib3==2.3.0
+      - vit-pytorch==1.10.1
       - werkzeug==3.1.3
-      - wrapt==1.17.2
+      - wrapt==1.14.1
+      - zipp==3.21.0
