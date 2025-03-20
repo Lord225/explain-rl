@@ -3,6 +3,7 @@ from collections import deque
 import os
 from typing import Any, Optional, Tuple, Union
 import gymnasium as gym
+import torchsummary
 from procgen import ProcgenEnv
 from stable_baselines3.common.policies import ActorCriticCnnPolicy
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
@@ -63,8 +64,8 @@ class CustomNetwork(nn.Module):
                 dim = 64,
                 channels=9,
                 depth = 4,
-                heads = 4,
-                mlp_dim = 128,
+                heads = 6,
+                mlp_dim = 256,
                 dropout = 0.1,
                 emb_dropout = 0.1,
             )
@@ -119,89 +120,9 @@ class CustomActorCriticPolicy(ActorCriticPolicy):
     def _build_mlp_extractor(self) -> None:
         self.mlp_extractor = CustomNetwork(self.features_dim)
 
-import torch.nn.functional as F
+import torchsummary
 
-class VariationalEncoder(nn.Module):
-    def __init__(self):
-        super(VariationalEncoder, self).__init__()
-
-        # conv2d arch
-        self.conv1 = nn.Conv2d(3, 32, kernel_size=8, stride=4)
-        self.conv2 = nn.Conv2d(32, 32, kernel_size=4, stride=2)
-        self.conv3 = nn.Conv2d(32, 32, kernel_size=3, stride=1)
-        self.conv4 = nn.Conv2d(32, 32, kernel_size=2, stride=1)
-        self.conv5 = nn.Conv2d(32, 32, kernel_size=2, stride=1)
-        
-        self.muout = nn.Linear(128, 128)
-        self.sigmaout = nn.Linear(128, 128)
-
-        self.N = torch.distributions.Normal(0, 1)
-        self.N.loc = self.N.loc.cuda() # hack to get sampling on the GPU
-        self.N.scale = self.N.scale.cuda()
-        self.kl = 0
-
-    def forward(self, x):
-        x = torch.unflatten(x, 1, (9, 64, 64))
-        x = F.relu(self.conv1(x))
-        x = F.relu(self.conv2(x))
-        x = F.relu(self.conv3(x))
-        x = F.relu(self.conv4(x))
-        x = F.relu(self.conv5(x))
-        x = torch.flatten(x, 1)
-        
-        mu =  self.muout(x)
-        sigma = torch.exp(self.sigmaout(x))
-        z = mu + sigma*self.N.sample(mu.shape)
-        self.kl = (sigma**2 + mu**2 - torch.log(sigma) - 1/2).sum()
-        return z
-
-class Decoder(nn.Module):
-    def __init__(self):
-        super(Decoder, self).__init__()
-
-        self.deconv1 = nn.ConvTranspose2d(128, 64, kernel_size=2, stride=1)
-        self.deconv2 = nn.ConvTranspose2d(32, 32, kernel_size=2, stride=1)
-        self.deconv3 = nn.ConvTranspose2d(32, 32, kernel_size=3, stride=1)
-        self.deconv4 = nn.ConvTranspose2d(32, 32, kernel_size=3, stride=2)
-
-        self.out = nn.ConvTranspose2d(32, 3, kernel_size=8, stride=4)
-
-    def forward(self, z):
-        z = torch.flatten(z, 1)
-        z = torch.reshape(z, (-1, 128, 1, 1))
-        x = F.relu(self.deconv1(z))
-        x = F.relu(self.deconv2(x))
-        x = F.relu(self.deconv3(x))
-        x = F.relu(self.deconv4(x))
-        x = self.out(x)
-        return x
-    
-class VariationalAutoencoder(nn.Module):
-    def __init__(self):
-        super(VariationalAutoencoder, self).__init__()
-        self.encoder = VariationalEncoder()
-        self.decoder = Decoder()
-
-    def forward(self, x):
-        z = self.encoder(x)
-        return self.decoder(z)
-
-# test if the model is working
-model = VariationalAutoencoder()
-
-# load noise as input
-x = torch.randn(1, 3, 64, 64)
-x = x.cuda()
-
-# run the model
-x_hat = model(x)
-
-# check the output
-print(x_hat.shape)
-
-
-
-exit()
+torchsummary.summary(CustomNetwork(64).policy_net.cuda(),(9*64*64,))
 
 from rl import config
 from tensorboardX import SummaryWriter
@@ -220,17 +141,17 @@ if __name__ == "__main__":
 
     # Define and train model
     model = PPO(CustomActorCriticPolicy, venv, verbose=1, tensorboard_log=config.LOG_DIR_ROOT, 
-                normalize_advantage=False,
-                batch_size=128,
-                n_steps=128*8*16,
+                normalize_advantage=True,
+                batch_size=256,
+                n_steps=128*16*8,
                 n_epochs=16,
-                gamma=0.999,
+                gamma=0.99,
                 gae_lambda=0.95,
                 clip_range=0.2,
                 ent_coef=0.01,
                 vf_coef=0.5,
                 max_grad_norm=0.5,
-                learning_rate=3e-5,
+                learning_rate=7e-6,
                 )
     
     print(f"Resumed from episode {BASE_EPISODE*100000}")

@@ -15,7 +15,7 @@ class ProcGenWrapper(gym.Env):
 
         # Create single-instance ProcgenEnv (num_envs=1)
         self.venv = ProcgenEnv(num_envs=num_envs, env_name=env_name, num_levels=num_levels, 
-                               start_level=start_level, distribution_mode=distribution_mode)
+                               start_level=start_level, distribution_mode=distribution_mode, use_backgrounds=False)
 
         # Extract observation & action space
         self.num_envs = num_envs
