@@ -143,15 +143,15 @@ if __name__ == "__main__":
     model = PPO(CustomActorCriticPolicy, venv, verbose=1, tensorboard_log=config.LOG_DIR_ROOT, 
                 normalize_advantage=True,
                 batch_size=256,
-                n_steps=128*16*8,
-                n_epochs=16,
+                n_steps=256*16,
+                n_epochs=3,
                 gamma=0.99,
-                gae_lambda=0.95,
+                gae_lambda=0.98,
                 clip_range=0.2,
                 ent_coef=0.01,
                 vf_coef=0.5,
                 max_grad_norm=0.5,
-                learning_rate=7e-6,
+                learning_rate=1e-5,
                 )
     
     print(f"Resumed from episode {BASE_EPISODE*100000}")
