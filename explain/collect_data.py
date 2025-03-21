@@ -1,4 +1,4 @@
-
+# collect data from model and env into h5 file
 from collections import deque
 import random
 from typing import Union
@@ -27,46 +27,54 @@ import procgenwrapper
 
 def collect_data_for(model: Union[PPO, CustomPPO], num_samples: int):
     # Create environment
-    venv = procgenwrapper.ProcGenWrapper(env_name="starpilot", 
-                          num_levels=0, 
-                          start_level=0, 
-                          distribution_mode="easy",
-                          collect_seg=True)
+    venv = procgenwrapper.ProcGenWrapper("starpilot", human=False, collect_seg=True)
+
     
-    observations = []
-    actions = []
-    rewards = []
-    dones = []
-    seg_observations = []
-    next_observations = []
+    observations = np.zeros((num_samples, 64, 64, 9), dtype=np.uint8)
+    actions = np.zeros((num_samples), dtype=np.int32)
+    rewards = np.zeros((num_samples), dtype=np.float32)
+    dones = np.zeros((num_samples), dtype=np.bool_)
+    seg_observations = np.zeros((num_samples, 64, 64, 3), dtype=np.uint8)
+    next_observations = np.zeros((num_samples, 64, 64, 9), dtype=np.uint8)
+    i = 0
+    END = False
     with tqdm.tqdm(total=num_samples) as pbar:
-        while len(observations) < num_samples:
+        while not END:
             obs, _ = venv.reset()
             done = False
             while not done:
-                with torch.no_grad():
-                    obs_tensor = obs_as_tensor(obs, "cuda")  # type: ignore
-                    obs_tensor = obs_tensor.reshape((1, -1))
-                    action, _, _ = model.policy(obs_tensor)
-                    action = action.cpu().numpy()[0]
+                if i > num_samples-1:
+                    END = True
+                    break
+                action, _ = model.predict(obs)
 
                 next_obs, reward, done, _, info = venv.step(action)
 
-                observations.append(obs)
-                actions.append(action)
-                rewards.append(reward)
-                dones.append(done)
-                seg_observations.append(info['seg'])
-                next_observations.append(next_obs)
+                observations[i] = np.uint8(obs)
+                actions[i] = action
+                rewards[i] = reward
+                dones[i] = done
+                seg_observations[i] = np.uint8(info["seg"])
+                next_observations[i] = np.uint8(next_obs)
+
+                i += 1
+                
                 obs = next_obs
-            pbar.update(1)
+
+                pbar.update(1)
+                
+                if done:
+                    pbar.set_description(f"r: {np.sum(rewards)/np.sum(dones):.2f}")
+                    break
+
+
     
     return observations, actions, rewards, dones, seg_observations, next_observations
 
 argsparser = argparse.ArgumentParser()
 
 argsparser.add_argument("--models", type=str, default="/home/lord225/pyrepos/explain-rl/preserve", help="path to models")
-argsparser.add_argument("--num_samples", type=int, default=50_000, help="number of samples to collect")
+argsparser.add_argument("--num_samples", type=int, default=10_000, help="number of samples to collect")
 argsparser.add_argument("--output", type=str, default="/home/lord225/pyrepos/explain-rl/explain/records", help="output path")
 argsparser.add_argument("--override", action="store_true", help="override existing records")
 
@@ -87,18 +95,25 @@ def main():
         model_name = model_path.split("/")[-1]
         observations, actions, rewards, dones, seg_observations, next_observations = collect_data_for(model, args.num_samples)
         with h5py.File(f"{PATH}/{model_name}_replay.h5", "w") as f:
-            f.create_dataset("observations", data=np.array(observations))
+            f.create_dataset("observations", data=np.array(observations, dtype=np.uint8))
             f.create_dataset("actions", data=np.array(actions))
             f.create_dataset("rewards", data=np.array(rewards))
             f.create_dataset("dones", data=np.array(dones))
-            f.create_dataset("seg_observations", data=np.array(seg_observations))
-            f.create_dataset("next_observations", data=np.array(next_observations))
+            f.create_dataset("seg_observations", data=np.array(seg_observations, dtype=np.uint8))
+            f.create_dataset("next_observations", data=np.array(next_observations, dtype=np.uint8))
         
         # print statistics
         print(f"Model: {model_name}")
-        print(f"Avg reward: {np.mean(rewards)}")
+        print(f"Avg reward: {np.sum(rewards)/np.sum(dones)}")
         print(f"Max reward: {np.max(rewards)}")
         print(f"Std reward: {np.min(rewards)}")
+        del observations
+        del actions
+        del rewards
+        del dones
+        del seg_observations
+        del next_observations
+        del model
         
 if __name__ == "__main__":
     main()

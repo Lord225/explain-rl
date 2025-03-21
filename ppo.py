@@ -432,7 +432,7 @@ class CustomOnPolicyAlgorithm(BaseAlgorithm):
 
             with th.no_grad():
                 # Convert to pytorch tensor or to TensorDict
-                obs_tensor = obs_as_tensor(self._last_obs, self.device)
+                obs_tensor = obs_as_tensor(self._last_obs, self.device) # type: ignore[arg-type]
                 actions, values, log_probs = self.policy(obs_tensor)
             actions = actions.cpu().numpy()
 
@@ -760,7 +760,7 @@ class PPO(OnPolicyAlgorithm):
                     # Clip the difference between old and new value
                     # NOTE: this depends on the reward scaling
                     values_pred = rollout_data.old_values + th.clamp(
-                        values - rollout_data.old_values, -clip_range_vf, clip_range_vf
+                        values - rollout_data.old_values, -clip_range_vf, clip_range_vf # type: ignore
                     )
                 # Value loss using the TD(gae_lambda) target
                 value_loss = F.mse_loss(rollout_data.returns, values_pred)
@@ -1011,7 +1011,7 @@ class CustomPPO(CustomOnPolicyAlgorithm):
                     # Clip the difference between old and new value
                     # NOTE: this depends on the reward scaling
                     values_pred = rollout_data.old_values + th.clamp(
-                        values - rollout_data.old_values, -clip_range_vf, clip_range_vf
+                        values - rollout_data.old_values, -clip_range_vf, clip_range_vf # type: ignore
                     )
                 # Value loss using the TD(gae_lambda) target
                 value_loss = F.mse_loss(rollout_data.returns, values_pred)
@@ -1072,7 +1072,7 @@ class CustomPPO(CustomOnPolicyAlgorithm):
             self.logger.record("train/clip_range_vf", clip_range_vf)
 
     def learn(
-        self: SelfPPO,
+        self: SelfPPO, # type: ignore[override]
         total_timesteps: int,
         callback: MaybeCallback = None,
         log_interval: int = 1,

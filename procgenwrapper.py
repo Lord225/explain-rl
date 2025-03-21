@@ -69,11 +69,8 @@ class ProcGenWrapper(gym.Env):
         if self.human:
             frame = obs.reshape((64, 64, 3))
             frame = cv2.resize(frame, (frame.shape[1]*8, frame.shape[0]*8), interpolation=cv2.INTER_NEAREST)
-            frame_seg = obs_seg.reshape((64, 64, 3))
-            frame_seg = cv2.resize(frame_seg, (frame_seg.shape[1]*8, frame_seg.shape[0]*8), interpolation=cv2.INTER_NEAREST)
-
+            
             cv2.imshow("Human", frame)
-            cv2.imshow("Segmented", frame_seg)
         
         #mono = obs_seg[0]
         #mono = np.argmax((mono.reshape(-1, 1, 3) == ProcGenWrapper.UNIQUE_COLORS).all(axis=2), axis=1)
