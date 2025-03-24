@@ -117,7 +117,7 @@ class CustomRolloutBuffer(BaseBuffer):
         self.log_probs = np.zeros((self.buffer_size, self.n_envs), dtype=np.float32)
         self.advantages = np.zeros((self.buffer_size, self.n_envs), dtype=np.float32)
         self.next_observations = np.zeros((self.buffer_size, self.n_envs, *self.obs_shape), dtype=np.float32)
-        self.seg_obsevations = np.zeros((self.buffer_size, self.n_envs, *self.obs_shape), dtype=np.float32)
+        self.seg_obsevations = np.zeros((self.buffer_size, self.n_envs, 16, 16, 3), dtype=np.float32)
         self.generator_ready = False
         super().reset()
 
@@ -479,11 +479,11 @@ class CustomOnPolicyAlgorithm(BaseAlgorithm):
                         terminal_value = self.policy.predict_values(terminal_obs)[0]  # type: ignore[arg-type]
                     rewards[idx] += self.gamma * terminal_value
 
-                seg_observaion = infos[idx].get("seg_observation", None)
+                seg_observaion = infos[idx].get("seg_onehot", None)
 
                 if seg_observaion is not None:
                     seg_observaions.append(seg_observaion)
-                
+
             rollout_buffer.add(
                 self._last_obs,  # type: ignore[arg-type]
                 actions,
@@ -878,6 +878,7 @@ class CustomPPO(CustomOnPolicyAlgorithm):
         _init_setup_model: bool = True,
         curiosityNetwork: Optional[th.nn.Module] = None,
         curiosityCoef: float = 0.0,
+        sef_coef: float = 0.5,
     ):
         super().__init__(
             policy,
@@ -939,6 +940,7 @@ class CustomPPO(CustomOnPolicyAlgorithm):
         self.clip_range_vf = clip_range_vf
         self.normalize_advantage = normalize_advantage
         self.target_kl = target_kl
+        self.sef_coef = sef_coef
 
         if _init_setup_model:
             self._setup_model()
@@ -969,6 +971,7 @@ class CustomPPO(CustomOnPolicyAlgorithm):
             clip_range_vf = self.clip_range_vf(self._current_progress_remaining)  # type: ignore[operator]
 
         entropy_losses = []
+        segmentatioN_losses = []
         pg_losses, value_losses = [], []
         clip_fractions = []
 
@@ -1026,7 +1029,21 @@ class CustomPPO(CustomOnPolicyAlgorithm):
 
                 entropy_losses.append(entropy_loss.item())
 
-                loss = policy_loss + self.ent_coef * entropy_loss + self.vf_coef * value_loss
+                # segmentation loss for explainability
+
+                segments = rollout_data.seg_obsevations
+                segments = segments.reshape(-1, 3)
+
+                outputs = self.policy.mlp_extractor.forward_segmentation(rollout_data.observations)
+                outputs = outputs[:, 1:, :]
+                outputs = outputs.reshape(-1, 3)
+                
+                # minimize cross entropy loss between segments and outputs
+                segmentation_loss = F.mse_loss(outputs, segments)
+                segmentatioN_losses.append(segmentation_loss.item())
+
+
+                loss = policy_loss + self.ent_coef * entropy_loss + self.vf_coef * value_loss + self.sef_coef * segmentation_loss
 
                 # Calculate approximate form of reverse KL Divergence for early stopping
                 # see issue #417: https://github.com/DLR-RM/stable-baselines3/issues/417
@@ -1061,6 +1078,7 @@ class CustomPPO(CustomOnPolicyAlgorithm):
         self.logger.record("train/value_loss", np.mean(value_losses))
         self.logger.record("train/approx_kl", np.mean(approx_kl_divs))
         self.logger.record("train/clip_fraction", np.mean(clip_fractions))
+        self.logger.record("train/segmentation_loss", np.mean(segmentatioN_losses))
         self.logger.record("train/loss", loss.item())
         self.logger.record("train/explained_variance", explained_var)
         if hasattr(self.policy, "log_std"):
