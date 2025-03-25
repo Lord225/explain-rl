@@ -33,7 +33,7 @@ if args.resume is not None:
     # path has form of /path/to/model/episode so take last part of path
     # 20250311-160440-FigurePictureMemory_10_v3.0
     # parse _10_ 
-    BASE_EPISODE = int(args.resume.split("_")[-2])
+    BASE_EPISODE = int(args.resume.split("_")[-2]) + 1
 else:
     params.resumed = 'not resumed'
     BASE_EPISODE = 0
@@ -159,7 +159,7 @@ if __name__ == "__main__":
     model = CustomPPO(CustomActorCriticPolicy, venv, verbose=1, tensorboard_log=config.LOG_DIR_ROOT, 
                 normalize_advantage=False,
                 batch_size=256,
-                n_steps=256*8*4,
+                n_steps=256*8*8*2,
                 n_epochs=10,
                 gamma=0.99,
                 gae_lambda=0.95,
@@ -179,7 +179,7 @@ if __name__ == "__main__":
 
     
     print(f"Resumed from episode {BASE_EPISODE*100000}")
-    if BASE_EPISODE != 0:
+    if BASE_EPISODE is not None:
         # model.load(params.resume, venv, custom_objects={"CustomActorCriticPolicy": CustomActorCriticPolicy, "ViT": ViT})
         print("Loading model from", params.resume, "episode", BASE_EPISODE*100000)
         model = CustomPPO.load(
@@ -187,10 +187,17 @@ if __name__ == "__main__":
                 print_system_info=True, 
                 env=venv, 
                 tensorboard_log=config.LOG_DIR_ROOT,
-                n_steps=256*8,
+                n_steps=256*8*8,
                 custom_objects={"CustomActorCriticPolicy": CustomActorCriticPolicy, "ViT": ViT, "RolloutBuffer": model.rollout_buffer },
-                learning_rate=1e-5,
-                )
+                gamma=0.99,
+                gae_lambda=0.95,
+                ent_coef=0.01,
+                vf_coef=0.5,
+                sef_coef = 10,
+                max_grad_norm=0.5,
+                learning_rate=3e-5,
+            )
+    
 
 
     for i in range(500):
