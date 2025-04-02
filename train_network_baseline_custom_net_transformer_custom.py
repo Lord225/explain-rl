@@ -178,9 +178,9 @@ if __name__ == "__main__":
                 n_steps=256*8*8*4,
                 custom_objects={"CustomActorCriticPolicy": CustomActorCriticPolicy, "ViT": ViT, "RolloutBuffer": model.rollout_buffer },
                 n_epochs=3,
-                learning_rate=1e-5,
+                learning_rate=1e-6,
                 ent_coef=0.01,
-                sef_coef=25,
+                sef_coef=50,
             )
         
         print(model.__class__.__name__)
