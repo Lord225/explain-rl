@@ -36,7 +36,7 @@ if args.resume is not None:
     BASE_EPISODE = int(args.resume.split("_")[-2]) + 1
 else:
     params.resumed = 'not resumed'
-    BASE_EPISODE = 0
+    BASE_EPISODE = None
 
 from stable_baselines3.common.policies import ActorCriticPolicy
 from vit_pytorch import ViT
@@ -67,7 +67,7 @@ class CustomNetwork(nn.Module):
                 depth = 4,
                 heads = 6,
                 mlp_dim = 256,
-                dropout = 0.0,
+                dropout = 0.1,
                 emb_dropout = 0.0,
             )
         )
@@ -156,19 +156,7 @@ if __name__ == "__main__":
                           distribution_mode="easy")
 
     # Define and train model
-    model = CustomPPO(CustomActorCriticPolicy, venv, verbose=1, tensorboard_log=config.LOG_DIR_ROOT, 
-                normalize_advantage=False,
-                batch_size=256,
-                n_steps=256*8*8*2,
-                n_epochs=10,
-                gamma=0.99,
-                gae_lambda=0.95,
-                ent_coef=0.01,
-                vf_coef=0.5,
-                sef_coef = 1.5,
-                max_grad_norm=0.5,
-                learning_rate=1e-4,
-                )
+    model = CustomPPO(CustomActorCriticPolicy, venv, verbose=1, tensorboard_log=config.LOG_DIR_ROOT)
     
     # # loading another model
     # trained_model = PPO.load("/home/lord225/pyrepos/explain-rl/models/20250320-153156-WorkSeemMonth_111_v3.1",print_system_info=True, env=venv, tensorboard_log=config.LOG_DIR_ROOT,
@@ -178,8 +166,8 @@ if __name__ == "__main__":
     # model.policy.load_state_dict(trained_model.policy.state_dict(), strict=False)
 
     
-    print(f"Resumed from episode {BASE_EPISODE*100000}")
     if BASE_EPISODE is not None:
+        print(f"Resumed from episode {BASE_EPISODE*100000}")
         # model.load(params.resume, venv, custom_objects={"CustomActorCriticPolicy": CustomActorCriticPolicy, "ViT": ViT})
         print("Loading model from", params.resume, "episode", BASE_EPISODE*100000)
         model = CustomPPO.load(
@@ -187,16 +175,15 @@ if __name__ == "__main__":
                 print_system_info=True, 
                 env=venv, 
                 tensorboard_log=config.LOG_DIR_ROOT,
-                n_steps=256*8*8,
+                n_steps=256*8*8*4,
                 custom_objects={"CustomActorCriticPolicy": CustomActorCriticPolicy, "ViT": ViT, "RolloutBuffer": model.rollout_buffer },
-                gamma=0.99,
-                gae_lambda=0.95,
+                n_epochs=3,
+                learning_rate=1e-5,
                 ent_coef=0.01,
-                vf_coef=0.5,
-                sef_coef = 10,
-                max_grad_norm=0.5,
-                learning_rate=3e-5,
+                sef_coef=25,
             )
+        
+        print(model.__class__.__name__)
     
 
 
