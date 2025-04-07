@@ -178,8 +178,8 @@ if __name__ == "__main__":
                 n_steps=256*8*8*4,
                 custom_objects={"CustomActorCriticPolicy": CustomActorCriticPolicy, "ViT": ViT, "RolloutBuffer": model.rollout_buffer },
                 n_epochs=3,
-                learning_rate=1e-6,
-                ent_coef=0.01,
+                learning_rate=3e-7,
+                ent_coef=0.02,
                 sef_coef=50,
             )
         

@@ -32,10 +32,10 @@ if args.resume is not None:
     # path has form of /path/to/model/episode so take last part of path
     # 20250311-160440-FigurePictureMemory_10_v3.0
     # parse _10_ 
-    BASE_EPISODE = int(args.resume.split("_")[-2])
+    BASE_EPISODE = int(args.resume.split("_")[-2]) + 1
 else:
     params.resumed = 'not resumed'
-    BASE_EPISODE = 0
+    BASE_EPISODE = None
 
 from stable_baselines3.common.policies import ActorCriticPolicy
 from vit_pytorch import ViT
@@ -154,12 +154,21 @@ if __name__ == "__main__":
                 learning_rate=1e-5,
                 )
     
-    print(f"Resumed from episode {BASE_EPISODE*100000}")
-    if BASE_EPISODE != 0:
+    if BASE_EPISODE is not None:
+        print(f"Resumed from episode {BASE_EPISODE*100000}")
         # model.load(params.resume, venv, custom_objects={"CustomActorCriticPolicy": CustomActorCriticPolicy, "ViT": ViT})
         print("Loading model from", params.resume, "episode", BASE_EPISODE*100000)
-        model = PPO.load(params.resume, print_system_info=True, env=venv, tensorboard_log=config.LOG_DIR_ROOT,
-                custom_objects={"CustomActorCriticPolicy": CustomActorCriticPolicy, "ViT": ViT})
+        model = PPO.load(
+                params.resume, 
+                print_system_info=True, 
+                env=venv, 
+                tensorboard_log=config.LOG_DIR_ROOT,
+                n_steps=256*8*8*4,
+                custom_objects={"CustomActorCriticPolicy": CustomActorCriticPolicy, "ViT": ViT, "RolloutBuffer": model.rollout_buffer },
+                n_epochs=3,
+                learning_rate=3e-7,
+                ent_coef=0.02,
+             )
 
 
     for i in range(500):
