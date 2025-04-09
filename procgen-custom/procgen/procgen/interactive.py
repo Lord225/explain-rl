@@ -9,6 +9,14 @@ from gym3 import Interactive, VideoRecorderWrapper, unwrap
 class ProcgenInteractive(Interactive):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        print(self._keys_to_act('UP'))
+        print(self._keys_to_act('DOWN'))
+        print(self._keys_to_act('LEFT'))
+        print(self._keys_to_act('RIGHT'))
+        print(self._keys_to_act('W'))
+        print(self._keys_to_act('S'))
+        print(self._keys_to_act('A'))
+        print(self._keys_to_act('D'))
         self._saved_state = None
 
     def _update(self, dt, keys_clicked, keys_pressed):

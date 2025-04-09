@@ -1,9 +1,11 @@
 import cv2
 import argparse
 import sys
-sys.path.append("/home/lord225/pyrepos/explain-rl")
-import ppo
-from procgenwrapper import ProcGenWrapper
+import sys
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir)))
+import procgenwrapper
+from ppo import PPO, CustomPPO
 import torch as th
 
 parser = argparse.ArgumentParser()
@@ -12,14 +14,13 @@ parser.add_argument("--resume", type=str, default=None, help="resume from a mode
 
 args = parser.parse_args()
 
+venv = procgenwrapper.ProcGenWrapper("starpilot", human=False, collect_seg=True, raw_seg=True)
 
 PATH = args.resume
-model = ppo.PPO.load(PATH, print_system_info=True)
+model = PPO.load(PATH, device="cuda")
 
 
-env = ProcGenWrapper("starpilot", human=True)
-
-obs, _ = env.reset()
+obs, _ = venv.reset()
 
 import cv2
 import numpy as np
@@ -81,11 +82,11 @@ recorder = Recorder(vit)
 while True:
     action, _ = model.predict(obs)
 
-    obs, rew, done, _, info = env.step(action)
+    obs, rew, done, _, info = venv.step(action)
 
     reward_sum += rew
 
-    segments = cv2.resize(info["seg"], (64*8, 64*8))
+    segments = cv2.resize(info["seg_onehot"], (64*8, 64*8), interpolation=cv2.INTER_NEAREST)
 
     att_map = visualize_attention(recorder, obs)
     
@@ -98,12 +99,13 @@ while True:
     
     cv2.imshow("attention", att_map)
     cv2.imshow("segments", segments)
+    cv2.imshow("obs", obs_map)
 
     cv2.waitKey(32)
 
     if done:
         print(reward_sum)
         reward_sum = 0
-        obs, _ = env.reset()
+        obs, _ = venv.reset()
 
     

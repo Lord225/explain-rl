@@ -20,6 +20,7 @@ class ProcGenWrapper(gym.Env):
                  frame_stack_count=3, 
                  human=False, 
                  collect_seg=True,
+                 raw_seg=False,
                  use_background=False):
         super().__init__()
 
@@ -41,6 +42,7 @@ class ProcGenWrapper(gym.Env):
         self.action_space = gym.spaces.Discrete(n=15)
         self.human = human
         self.collect_seg = collect_seg
+        self.raw_seg = raw_seg
         self.frame_stack_count = frame_stack_count
         self.frame_stack = deque(maxlen=self.frame_stack_count)
 
@@ -73,11 +75,12 @@ class ProcGenWrapper(gym.Env):
             cv2.imshow("Human", frame)
         
         mono = obs_seg[0]
-        mono = cv2.resize(mono, (16, 16), interpolation=cv2.INTER_NEAREST)
         # mono = np.argmax((mono.reshape(-1, 1, 3) == ProcGenWrapper.UNIQUE_COLORS).all(axis=2), axis=1).reshape(16, 16, 1).astype(np.int32)
         
-        # infos[0]['seg'] = obs_seg[0]
-        infos[0]['seg_onehot'] = np.array(mono, dtype=np.float32)/255.0
+        if self.raw_seg:
+            infos[0]['seg_onehot'] = mono
+        else:
+            infos[0]['seg_onehot'] = np.array(cv2.resize(mono, (16, 16), interpolation=cv2.INTER_NEAREST), dtype=np.float32)/255.0
 
         return self.get_observation(), rewards[0], dones[0], False, infos[0] 
 

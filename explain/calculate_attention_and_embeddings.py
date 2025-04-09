@@ -24,11 +24,9 @@ args = parser.parse_args()
 
 model = ppo.PPO.load(args.model, print_system_info=True)
 
-
 if args.dataset is None:
     RECORDS_PATH = '/home/lord225/pyrepos/explain-rl/explain/records'
     args.dataset = os.path.join(RECORDS_PATH, f"{args.model.split('/')[-1]}_replay.h5")
-
 
 from vit_pytorch.extractor import Extractor
 from vit_pytorch.recorder import Recorder
@@ -72,7 +70,7 @@ for i in tqdm.tqdm(range(0, len(observations), batch_size)):
     del attention
     del features
 
-np.float = float
+np.float = float # type: ignore
 import dask.array as da
 
 # concat all into dask
