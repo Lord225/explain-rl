@@ -22,13 +22,15 @@ class ProcGenWrapper(gym.Env):
         self.reset()
 
     def reset(self):
-        self.env_normal = ProcgenEnv(num=self.num, 
+        self.env_normal = ProcgenEnv(num=self.num,
+                            num_envs=1, 
                             env_name=self.env, 
                             distribution_mode="easy",
                             use_backgrounds=False,
                             render_mode="rgb_array",
                             )
         self.env_mono = ProcgenEnv(num=self.num,
+                            num_envs=1,
                             env_name=self.env, 
                             distribution_mode="easy", 
                             render_mode="rgb_array",

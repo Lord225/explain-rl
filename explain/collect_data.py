@@ -1,35 +1,21 @@
 # collect data from model and env into h5 file
 from collections import deque
-import random
 from typing import Union
-import gym
 import numpy as np
 import argparse
-import tensorflow as tf
-import sys
 import sys
 import os
 import h5py
 import numpy as np
-from datetime import datetime
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir)))
-import torch
 import tqdm
-from stable_baselines3.common.utils import obs_as_tensor, safe_mean
 from ppo import PPO, CustomPPO
 
-import matplotlib.pyplot as plt
-import cv2
-from gym3 import Interactive, VideoRecorderWrapper, unwrap
 
 import procgenwrapper
-
+venv = procgenwrapper.ProcGenWrapper("starpilot", human=False, collect_seg=True, raw_seg=True)
 
 def collect_data_for(model: Union[PPO, CustomPPO], num_samples: int):
-    # Create environment
-    venv = procgenwrapper.ProcGenWrapper("starpilot", human=False, collect_seg=True)
-
-    
     observations = np.zeros((num_samples, 64, 64, 9), dtype=np.uint8)
     actions = np.zeros((num_samples), dtype=np.int32)
     rewards = np.zeros((num_samples), dtype=np.float32)
@@ -54,7 +40,7 @@ def collect_data_for(model: Union[PPO, CustomPPO], num_samples: int):
                 actions[i] = action
                 rewards[i] = reward
                 dones[i] = done
-                seg_observations[i] = np.uint8(info["seg"])
+                seg_observations[i] = np.uint8(info["seg_onehot"])
                 next_observations[i] = np.uint8(next_obs)
 
                 i += 1
@@ -90,17 +76,26 @@ def main():
     PATH = "/home/lord225/pyrepos/explain-rl/explain/records"
     
     for model_path in models:
+        print(f"Loading model from {model_path}")
         model = PPO.load(model_path, device="cuda")
         # model name is file name
         model_name = model_path.split("/")[-1]
         observations, actions, rewards, dones, seg_observations, next_observations = collect_data_for(model, args.num_samples)
+        print(f"Saving collected samples incrementally as {model_name}_replay.h5")
         with h5py.File(f"{PATH}/{model_name}_replay.h5", "w") as f:
-            f.create_dataset("observations", data=np.array(observations, dtype=np.uint8))
-            f.create_dataset("actions", data=np.array(actions))
-            f.create_dataset("rewards", data=np.array(rewards))
-            f.create_dataset("dones", data=np.array(dones))
-            f.create_dataset("seg_observations", data=np.array(seg_observations, dtype=np.uint8))
-            f.create_dataset("next_observations", data=np.array(next_observations, dtype=np.uint8))
+            f.create_dataset("observations", shape=observations.shape, dtype=np.uint8, chunks=True, compression="gzip")
+            f.create_dataset("actions", shape=actions.shape, dtype=np.int32, chunks=True, compression="gzip")
+            f.create_dataset("rewards", shape=rewards.shape, dtype=np.float32, chunks=True, compression="gzip")
+            f.create_dataset("dones", shape=dones.shape, dtype=np.bool_, chunks=True, compression="gzip")
+            f.create_dataset("seg_observations", shape=seg_observations.shape, dtype=np.uint8, chunks=True, compression="gzip")
+            f.create_dataset("next_observations", shape=next_observations.shape, dtype=np.uint8, chunks=True, compression="gzip")
+            
+            f["observations"][:] = observations
+            f["actions"][:] = actions
+            f["rewards"][:] = rewards
+            f["dones"][:] = dones
+            f["seg_observations"][:] = seg_observations
+            f["next_observations"][:] = next_observations
         
         # print statistics
         print(f"Model: {model_name}")
