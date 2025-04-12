@@ -53,8 +53,6 @@ def collect_data_for(model: Union[PPO, CustomPPO], num_samples: int):
                     pbar.set_description(f"r: {np.sum(rewards)/np.sum(dones):.2f}")
                     break
 
-
-    
     return observations, actions, rewards, dones, seg_observations, next_observations
 
 argsparser = argparse.ArgumentParser()
