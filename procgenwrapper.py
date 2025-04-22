@@ -6,11 +6,22 @@ from procgen import ProcgenEnv
 import numpy as np
 import cv2
 
-
+import torch
+import torch.nn as nn
 
 
 class ProcGenWrapper(gym.Env):
-    UNIQUE_COLORS = np.array([(191, 255, 191), (191, 63, 191), (191, 255, 255), (127, 127, 255), (255, 127, 63), (0.0, 0.0, 0.0), (255, 191, 191), (255, 127, 127), (255, 191, 255), (127, 255, 127), (127, 63, 127), (63, 127, 127), (127, 63, 191), (127, 191, 63)], dtype=np.uint8)[np.newaxis]
+    UNIQUE_COLORS = np.array([[  0,   0,   0],
+                            [127,  63, 127],
+                            [127,  63, 191],
+                            [127, 127, 255],
+                            [127, 191,  63],
+                            [127, 255, 127],
+                            [191, 255, 255],
+                            [255, 127, 127],
+                            [255, 191, 191],
+                            [255, 191, 255]], dtype=np.uint8)
+    POOLER = nn.MaxPool2d(kernel_size=4, stride=4)
 
     def __init__(self, env_name="starpilot", 
                  num_envs=1, 
@@ -21,6 +32,7 @@ class ProcGenWrapper(gym.Env):
                  human=False, 
                  collect_seg=True,
                  raw_seg=False,
+                 one_hot=False,
                  use_background=False):
         super().__init__()
 
@@ -78,6 +90,12 @@ class ProcGenWrapper(gym.Env):
         # mono = np.argmax((mono.reshape(-1, 1, 3) == ProcGenWrapper.UNIQUE_COLORS).all(axis=2), axis=1).reshape(16, 16, 1).astype(np.int32)
         
         if self.raw_seg:
+            infos[0]['seg_onehot'] = mono
+        elif self.collect_seg:
+            mono = torch.from_numpy(mono).permute(2, 0, 1)
+            mono = ProcGenWrapper.POOLER(mono).permute(1, 2, 0).numpy()
+            mono = np.argmax((mono.reshape(-1, 1, 3) == ProcGenWrapper.UNIQUE_COLORS).all(axis=2), axis=1).reshape(16, 16, 1).astype(np.int32)
+        
             infos[0]['seg_onehot'] = mono
         else:
             infos[0]['seg_onehot'] = np.array(cv2.resize(mono, (16, 16), interpolation=cv2.INTER_NEAREST), dtype=np.float32)/255.0
