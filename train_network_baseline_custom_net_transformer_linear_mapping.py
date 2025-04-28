@@ -25,7 +25,7 @@ args = parser.parse_args()
 params = argparse.Namespace()
 
 params.env_name = "starpilot"
-params.version = "v4.3"
+params.version = "v4.5"
 params.DRY_RUN = False
 params.resume = args.resume
 if args.resume is not None:
@@ -184,11 +184,11 @@ if __name__ == "__main__":
                 env=venv, 
                 tensorboard_log=config.LOG_DIR_ROOT,
                 custom_objects={"CustomActorCriticPolicy": CustomActorCriticPolicy, "ViT": ViT, "RolloutBuffer": model.rollout_buffer },
-                n_steps=256*8*8,
+                n_steps=256*8*8*4,
                 n_epochs=3,
-                learning_rate=1e-5,
-                ent_coef=0.01,
-                sef_coef=1,
+                learning_rate=1e-7,
+                ent_coef=0.02,
+                sef_coef=2,
             )
         
         print(model.__class__.__name__)
