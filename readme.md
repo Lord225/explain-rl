@@ -17,13 +17,23 @@ The project investigates the use of Proximal Policy Optimization (PPO) combined 
 * Comparison with CNNs: A comparative study between Convolutional Neural Networks (CNNs) and ViTs in terms of performance and interpretability.
 * Explaining behavior with decision trees: Using generated and explicit segmentation mask I built small and interpretable decision trees.
 
+# Results
+Using enviroments from [procgen](https://github.com/openai/procgen) benchmark we trained few architecures using modifed PPO algorithm. The results are in par with native PPO and sometimes can even surpass the original. 
+The experiments demonstrate the effectiveness of the proposed methods:
+* Improved Explainability: The use of segmentation-based regularization and attention mechanisms significantly enhances the interpretability of the agent's decisions.
+* Stability: The modified PPO algorithm have simillar stability compared to original algorithm.
+* 
+
 ![rewards](plots/reward-comp.png)
 
 ![explainer](plots/comp-explainer-loss.png)
 
 ![attention](explain/attention-20250418-212536-WhenFactBe_69_v4.2.gif)
 
+
 # Reproduction
+
+All logs, scripts and some models required to run experiments are in this repository.
 
 ## Install dependecies
 
@@ -35,5 +45,9 @@ You can run any script from src folder. Scripts starting with `train_*` are trai
 ```
 python train_network_baseline.py
 python train_network_baseline.py --resume ./path/to/resumed/model
+```
+## Track training
+```
+tensorboard --logdir ./logs
 ```
 
