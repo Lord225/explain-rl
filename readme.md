@@ -22,7 +22,6 @@ Using enviroments from [procgen](https://github.com/openai/procgen) benchmark we
 The experiments demonstrate the effectiveness of the proposed methods:
 * Improved Explainability: The use of segmentation-based regularization and attention mechanisms significantly enhances the interpretability of the agent's decisions.
 * Stability: The modified PPO algorithm have simillar stability compared to original algorithm.
-* 
 
 ![rewards](plots/reward-comp.png)
 
